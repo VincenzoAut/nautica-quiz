@@ -17,9 +17,10 @@ FILE_CARTEGGIO = os.path.join(BASE_DIR, "Quiz_Carteggio_Finale_OK.xlsx")
 FILE_RACCORDO = os.path.join(BASE_DIR, "Raccordoimmagini.xlsx")
 CARTELLA_IMMAGINI = os.path.join(BASE_DIR, "Immagini_Quiz")
 
-# --- 2. CSS PERSONALIZZATO ---
+# --- 2. CSS PERSONALIZZATO (RESPONSIVE) ---
 st.markdown("""
 <style>
+    /* Contenitore Metriche */
     .metric-container {
         display: flex; justify-content: space-between; background-color: white; padding: 15px;
         border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #e0e0e0;
@@ -27,15 +28,33 @@ st.markdown("""
     .metric-box { text-align: center; width: 100%; }
     .metric-label { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; }
     .metric-value { font-size: 22px; font-weight: 800; color: #333; }
-    .stButton button { width: 100%; border-radius: 8px; height: auto; padding: 12px; }
+    
+    /* Bottoni più comodi per il touch */
+    .stButton button { width: 100%; border-radius: 12px; height: auto; padding: 15px; font-size: 16px; margin-bottom: 5px; }
+    
+    /* Box Google */
     .google-box {
         display: block; background-color: #f1f3f5; border: 1px solid #dee2e6; border-radius: 8px;
-        padding: 12px; margin: 15px 0; text-align: center; text-decoration: none; color: #495057; font-size: 14px;
+        padding: 15px; margin: 15px 0; text-align: center; text-decoration: none; color: #495057; font-size: 14px;
     }
     .google-box:hover { border-color: #1c7ed6; color: #1c7ed6; background-color: #e7f5ff; }
-    .scenario-box { background: #e7f5ff; padding: 20px; border-left: 5px solid #1c7ed6; border-radius: 5px; margin-bottom: 20px; }
-    .footer { font-size: 13px; color: #666; text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; line-height: 1.5; }
+    
+    /* Box Carteggio */
+    .scenario-box { background: #e7f5ff; padding: 20px; border-left: 5px solid #1c7ed6; border-radius: 5px; margin-bottom: 20px; font-size: 16px; }
+    
+    /* Footer */
+    .footer { font-size: 12px; color: #666; text-align: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; line-height: 1.5; }
     .rule-box { padding: 10px; border-radius: 5px; border: 1px solid #ffe066; background-color: #fff9db; font-size: 14px; margin-top: 10px;}
+    
+    /* Striscia Progresso */
+    .stProgress > div > div > div > div { background-color: #1c7ed6; }
+    
+    /* Adattamento Immagini Placeholder */
+    .placeholder-img {
+        width: 100%; height: auto; min-height: 200px; background: #f8f9fa; 
+        display: flex; align-items: center; justify-content: center; flex-direction: column;
+        border: 2px dashed #ddd; border-radius: 8px; color: #aaa; padding: 20px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -156,7 +175,6 @@ with st.sidebar:
         st.session_state.current_row = None
         st.rerun()
     
-    # --- INDICAZIONE REGOLE (RICHIESTA) ---
     if "Carteggio" in st.session_state.quiz_mode:
         st.markdown('<div class="rule-box">📐 <b>REGOLE:</b> 5 esercizi.<br>Minimo <b>4 esatti</b> per idoneità.</div>', unsafe_allow_html=True)
     elif "Vela" in st.session_state.quiz_mode:
@@ -172,7 +190,6 @@ with st.sidebar:
 
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # --- INFO E ISTRUZIONI (SPOSTATO IN BASSO) ---
     with st.expander("ℹ️ INFO E ISTRUZIONI", expanded=False):
         st.markdown(f"""
         **Benvenuti su NauticaApp Pro!**
@@ -187,14 +204,13 @@ with st.sidebar:
         - **iOS:** Safari -> Condividi -> "Aggiungi a home".
         """)
 
-    # --- FOOTER CREDITI ---
     today = datetime.datetime.now().strftime("%d/%m/%Y")
     id_domanda = st.session_state.current_row.get('ID Progressivo','') if st.session_state.current_row is not None else ''
     
     st.markdown(f"""
     <div class="footer">
         <b>by Vincenzo Autolitano</b><br>
-        v1.7 - Aggiornato al {today}<br><br>
+        v1.8 Responsive - Agg. {today}<br><br>
         <a href="mailto:vincenzo.autolitano@gmail.com?subject=Segnalazione Errore NauticaApp&body=Errore nella domanda ID: {id_domanda}" style="color:#d63384; text-decoration:none;">⚠️ <b>SEGNALA ERRORE</b></a>
     </div>
     """, unsafe_allow_html=True)
@@ -204,27 +220,23 @@ icon_map = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}
 current_icon = icon_map.get(st.session_state.quiz_mode, '⚓')
 st.markdown(f"## {current_icon} **{st.session_state.quiz_mode}** - *{'Esame' if st.session_state.exam_mode else 'Allenamento'}*")
 
-# Dashboard Statistiche
 if not st.session_state.exam_finished:
     tot = st.session_state.score_ok + st.session_state.score_ko
     perc = int(st.session_state.score_ok / tot * 100) if tot > 0 else 0
     st.markdown(f'<div class="metric-container"><div class="metric-box"><div class="metric-label">Esatte</div><div class="metric-value" style="color:green">{st.session_state.score_ok}</div></div><div class="metric-box"><div class="metric-label">Errate</div><div class="metric-value" style="color:red">{st.session_state.score_ko}</div></div><div class="metric-box"><div class="metric-label">%</div><div class="metric-value">{perc}%</div></div><div class="metric-box"><div class="metric-label">Totali</div><div class="metric-value">{tot}</div></div></div>', unsafe_allow_html=True)
     
-    # STRISCIA DI PROGRESSIONE (FISSA SOTTO LE METRICHE)
     if st.session_state.exam_mode:
         q_idx = st.session_state.exam_index + 1
         q_max = len(st.session_state.exam_questions)
         st.progress(q_idx / q_max)
         st.caption(f"Avanzamento: Domanda {q_idx} di {q_max}")
 
-# Schermata Finale
 if st.session_state.exam_finished:
     passed = st.session_state.score_ok >= 4 if "Vela" in st.session_state.quiz_mode or "Carteggio" in st.session_state.quiz_mode else st.session_state.score_ko <= 4
     st.markdown(f"<h1 style='text-align:center; color:{'green' if passed else 'red'}'>{'PROMOSSO! 🎉' if passed else 'NON IDONEO 🚫'}</h1>", unsafe_allow_html=True)
     st.markdown(f"<h3 style='text-align:center'>{st.session_state.score_ok} Esatte - {st.session_state.score_ko} Errate</h3>", unsafe_allow_html=True)
     if st.button("🔄 NUOVA SIMULAZIONE", type="primary"): reset_game(True); st.rerun()
 
-# Domanda Corrente
 elif st.session_state.current_row is not None:
     row = st.session_state.current_row
     if "Carteggio" in st.session_state.quiz_mode:
@@ -243,8 +255,12 @@ elif st.session_state.current_row is not None:
         c1, c2 = st.columns([1, 2])
         with c1:
             pth = get_image_path(row.get('NomeImmagine'))
-            if pth: st.image(Image.open(pth), width=300)
-            else: st.markdown("<div class='placeholder-img'>⚓<br>NESSUNA IMMAGINE</div>", unsafe_allow_html=True)
+            if pth: 
+                # --- MODIFICA V1.8: USE_CONTAINER_WIDTH=TRUE ---
+                # Questo rende l'immagine responsive: 100% della colonna
+                st.image(Image.open(pth), use_container_width=True)
+            else: 
+                st.markdown("<div class='placeholder-img'>⚓<br>NESSUNA IMMAGINE</div>", unsafe_allow_html=True)
         with c2:
             st.markdown(f"##### {row.get('Argomento','Argomento')}")
             st.markdown(f"### {row.get('Domanda')}")
