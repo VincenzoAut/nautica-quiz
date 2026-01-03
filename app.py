@@ -44,8 +44,8 @@ st.markdown("""
     .stProgress > div > div > div > div { background-color: #1c7ed6; }
     .question-header { font-size: 14px; color: #333; background-color: #f1f3f5; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #1c7ed6; }
     .placeholder-img { width: 100%; height: auto; min-height: 180px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; flex-direction: column; border: 2px dashed #ddd; border-radius: 8px; color: #aaa; padding: 10px; }
-    /* Debug Box Style */
-    .debug-info { font-size: 12px; color: #666; background: #eee; padding: 8px; border-radius: 5px; margin-top: 10px; border: 1px dashed #999; }
+    /* STILE PER IL DEBUG */
+    .debug-info { font-size: 12px; color: #495057; background: #e9ecef; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px dashed #adb5bd; }
     @media (max-width: 768px) { .metric-value { font-size: 16px; } }
 </style>
 """, unsafe_allow_html=True)
@@ -258,35 +258,45 @@ with st.sidebar:
         st.markdown(f"<h1 style='text-align:center; color:{'red' if mm>=20 else 'black'}'>{mm:02d}:{ss:02d}</h1>", unsafe_allow_html=True)
         st.divider()
 
-    # --- NUOVA SEZIONE INFO COMPLETA ---
+    # --- SEZIONE INFO ---
     with st.expander("ℹ️ GUIDA E ISTRUZIONI", expanded=False):
         st.markdown("""
         **1. MODALITÀ DI STUDIO**
-        * 🎓 **Simulazione:** Simula l'esame reale (20 domande per Base, 5 per Vela/Carteggio). Alla fine vedrai l'esito.
-        * ♾️ **Allenamento:** Feedback immediato (Verde/Rosso) dopo ogni risposta. Ideale per studiare.
+        * 🎓 **Simulazione:** Simula l'esame reale (20 domande per Base, 5 per Vela/Carteggio).
+        * ♾️ **Allenamento:** Feedback immediato dopo ogni risposta.
 
         **2. MEMORIA INTELLIGENTE (SRS)**
-        L'app ricorda le tue prestazioni per ogni materia:
-        * 🔴 **Errori:** Se sbagli, la domanda viene marcata come "Critica" (Peso 10) e ti verrà chiesta molto spesso.
-        * 🟢 **Apprendimento:** Se indovini, la domanda apparirà sempre meno frequentemente (Peso decrescente).
-        * 🆕 **Nuove:** Hanno priorità normale.
+        * 🔴 **Errori:** Peso 10 (Escono spesso).
+        * 🟢 **Apprendimento:** Peso decrescente (Escono meno).
+        * 🆕 **Nuove:** Peso normale.
 
         **3. RIPASSO ERRORI**
-        Quando fai errori, appare un bottone rosso nella barra laterale. Usalo per fare una sessione dedicata solo alle domande che hai sbagliato. Se rispondi correttamente, l'errore viene cancellato.
-
-        **4. INSTALLAZIONE**
-        Su Android/iOS: Apri il menu del browser e seleziona **"Aggiungi a schermata Home"** per usare l'app a tutto schermo come una vera applicazione nativa.
+        Usa il tasto rosso per correggere solo gli errori attivi.
         """)
 
-    with st.expander("🧠 DEBUG DATI", expanded=False):
-        st.session_state.debug_mode = st.checkbox("🛠️ Mostra Pesi Tecnici")
+    # --- SEZIONE DEBUG RIPRISTINATA COMPLETAMENTE ---
+    with st.expander("🧠 STATO MEMORIA (Debug)", expanded=False):
+        st.session_state.debug_mode = st.checkbox("🛠️ Attiva Debug Mode")
+        
+        # Calcolo Statistiche
         total_mem = len([k for k in st.session_state.history if k.startswith(current_prefix)])
-        st.markdown(f"Domande in memoria: {total_mem}")
+        mastered = len([k for k,v in st.session_state.history.items() if k.startswith(current_prefix) and v > 0])
+        errors_debug = len([k for k,v in st.session_state.history.items() if k.startswith(current_prefix) and v == -1])
+        
+        st.markdown(f"**Statistiche per {st.session_state.quiz_mode}:**")
+        st.markdown(f"- 📂 Totale in memoria: **{total_mem}**")
+        st.markdown(f"- 🔴 Errori attivi: **{errors_debug}**")
+        st.markdown(f"- 🟢 In apprendimento: **{mastered}**")
+        
+        if st.checkbox("Mostra elenco ID"):
+             # Mostra solo ID puliti della materia corrente
+             debug_list = {k.replace(current_prefix, ""): v for k,v in st.session_state.history.items() if k.startswith(current_prefix)}
+             st.write(debug_list)
         
     st.markdown("<br>", unsafe_allow_html=True)
     today = datetime.datetime.now().strftime("%d/%m/%Y")
     id_d = st.session_state.current_row.get('ID Progressivo','') if st.session_state.current_row is not None else ''
-    st.markdown(f"<div class='footer'><b>by Vincenzo Autolitano</b><br>v4.2 Info Edition • {today}<br><a href='mailto:vincenzo.autolitano@gmail.com?subject=Errore ID {id_d}'>⚠️ SEGNALA ERRORE</a></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='footer'><b>by Vincenzo Autolitano</b><br>v4.3 Full Feature • {today}<br><a href='mailto:vincenzo.autolitano@gmail.com?subject=Errore ID {id_d}'>⚠️ SEGNALA ERRORE</a></div>", unsafe_allow_html=True)
 
 # --- 7. INTERFACCIA ---
 current_icon = icon_map = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}.get(st.session_state.quiz_mode, '⚓')
@@ -315,6 +325,7 @@ if st.session_state.exam_finished:
 elif st.session_state.current_row is not None:
     row = st.session_state.current_row
     
+    # --- VISUALIZZAZIONE DEBUG PESI (RIPRISTINATA) ---
     if st.session_state.debug_mode:
         id_dom = str(row.get('ID Progressivo'))
         ukey = get_unique_key(id_dom)
@@ -323,7 +334,12 @@ elif st.session_state.current_row is not None:
         status_text = "🆕 MAI VISTA"
         if val == -1: status_text = "🔴 ERRORE ATTIVO"
         elif val is not None and val > 0: status_text = f"🟢 CORRETTA {val} VOLTE"
-        st.markdown(f"""<div class="debug-info">🔧 <b>DEBUG:</b> ID {id_dom} | Stato: <b>{status_text}</b> | Peso: <b>{w:.2f}</b></div>""", unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="debug-info">
+            🔧 <b>DEBUG:</b> ID {id_dom} | Stato: <b>{status_text}</b> | Peso Estrazione: <b>{w:.2f}</b>
+        </div>
+        """, unsafe_allow_html=True)
 
     if "Carteggio" in st.session_state.quiz_mode:
         st.markdown(f"### Esercizio {row.get('ID Progressivo','')}")
