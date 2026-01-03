@@ -1,4 +1,4 @@
-# --- VERSIONE APP: v10.9 (Bug Fix - Esci Button) ---
+# --- VERSIONE APP: v10.12 (Final Polished - Power Icon) ---
 import streamlit as st
 import pandas as pd
 import os
@@ -68,14 +68,32 @@ st.markdown("""
     .metric-value { font-size: 18px; font-weight: 800; color: #333; }
     .stButton button { width: 100%; border-radius: 8px; height: auto; padding: 10px; font-size: 16px; margin-bottom: 5px; }
     
+    /* Stile specifico per il bottone Esci (Power Icon) */
+    div[data-testid="column"] button { 
+        padding: 5px 0px; 
+        font-size: 20px; 
+        border: 1px solid #ddd;
+        background-color: transparent;
+        color: #d63384; /* Colore un po' acceso per il logout */
+        font-weight: bold;
+    }
+    div[data-testid="column"] button:hover {
+        background-color: #fce4ec;
+        border-color: #d63384;
+    }
+    
     .result-box { padding: 10px; border-radius: 6px; margin-bottom: 5px; color: #000; font-weight: 600; border: 1px solid rgba(0,0,0,0.1); font-size: 15px; }
     .rank-box { background: linear-gradient(135deg, #0061f2 0%, #00c6f7 100%); padding: 15px; border-radius: 8px; color: white; text-align: center; margin-bottom: 20px; }
     .rank-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; font-weight: bold; }
     .rank-name { font-size: 22px; font-weight: 800; margin: 5px 0; }
-    .footer-sidebar { font-size: 11px; color: #888; text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; }
+    .footer-sidebar { font-size: 11px; color: #888; text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; line-height: 1.5; }
+    .footer-sidebar a { color: #666; text-decoration: none; border-bottom: 1px dotted #999; }
+    
     .exam-pass { background-color: #d4edda; color: #155724; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #c3e6cb; margin-bottom: 20px; }
     .exam-fail { background-color: #f8d7da; color: #721c24; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #f5c6cb; margin-bottom: 20px; }
     .review-end { background-color: #e2e3e5; color: #383d41; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #d6d8db; margin-bottom: 20px; }
+    
+    .debug-info { font-size: 11px; color: #495057; background: #e9ecef; padding: 5px; border-radius: 4px; margin-bottom: 10px; border: 1px dashed #adb5bd; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -138,7 +156,7 @@ def load_data(mode):
 if st.session_state.current_user is None:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("<h1 style='text-align:center;'>⚓ Patente Nautica App Pro</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color:#666;'>Cloud Edition v10.9</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color:#666;'>Cloud Edition v10.12</p>", unsafe_allow_html=True)
     
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
@@ -267,13 +285,14 @@ def answer(is_correct):
 with st.sidebar:
     st.title("⚓ Patente Nautica")
     
-    # BOX UTENTE + ESCI
-    col_u1, col_u2 = st.columns([3,1])
-    col_u1.markdown(f"👤 **{st.session_state.current_user}**")
-    # CORRETTO: rimosso parametro 'title' non supportato
-    if col_u2.button("Esci", help="Disconnetti"):
-        st.session_state.current_user = None
-        st.rerun()
+    # BOX UTENTE + ESCI ICONA (⏻)
+    col_u1, col_u2 = st.columns([4,1])
+    with col_u1:
+        st.markdown(f"👤 **{st.session_state.current_user}**")
+    with col_u2:
+        if st.button("⏻", help="Esci / Disconnetti"):
+            st.session_state.current_user = None
+            st.rerun()
     
     current_prefix = f"{st.session_state.quiz_mode}_"
     mastered_count = len([k for k, v in st.session_state.history.items() if k.startswith(current_prefix) and v > 0])
@@ -314,24 +333,52 @@ with st.sidebar:
     
     st.button("📊 STATISTICHE", on_click=reset_game, kwargs={'stats': True})
     
-    with st.expander("ℹ️ INFO", expanded=False):
-        st.info("I tuoi progressi vengono salvati automaticamente nel Cloud (Google Sheets) dopo ogni risposta.")
-
-    with st.expander("🛠️ Debug", expanded=False):
-        st.session_state.debug_mode = st.checkbox("Attiva Info")
-        st.write(f"ID Totali: {len([k for k in st.session_state.history if k.startswith(current_prefix)])}")
+    # --- INFO DETTAGLIATE RIPRISTINATE ---
+    with st.expander("ℹ️ GUIDA & INFO", expanded=False):
+        st.markdown("""
+        **Funzionamento App:**
+        * ☁️ **Cloud:** I progressi sono salvati automaticamente su Google Sheets.
+        * 🔄 **Sincronizzazione:** Puoi usare l'app da PC, Tablet o Smartphone ritrovando i tuoi dati.
+        
+        **Legenda:**
+        * 🟢 **Risposta Corretta:** +1 Punto Consolidation.
+        * 🔴 **Risposta Errata:** La domanda viene segnata come "Errore" (-1) e verrà riproposta più spesso.
+        """)
+    
+    with st.expander("🧠 DEBUG MEMORIA", expanded=False):
+        st.session_state.debug_mode = st.checkbox("🛠️ Attiva Debug Mode")
+        
+        total_mem = len([k for k in st.session_state.history if k.startswith(current_prefix)])
+        errors_debug = len([k for k,v in st.session_state.history.items() if k.startswith(current_prefix) and v == -1])
+        
+        st.markdown(f"**Dati Tecnici:**")
+        st.markdown(f"- Totale ID in memoria: {total_mem}")
+        st.markdown(f"- Errori Attivi: {errors_debug}")
+        
+        if st.checkbox("Mostra Elenco ID Completo"):
+             debug_list = {k.replace(current_prefix, ""): v for k,v in st.session_state.history.items() if k.startswith(current_prefix)}
+             st.write(debug_list)
     
     if st.session_state.exam_mode and st.session_state.start_time and not st.session_state.exam_finished:
         mm, ss = divmod(int(time.time() - st.session_state.start_time), 60)
         st.markdown(f"<h2 style='text-align:center; color:{'red' if mm>=20 else '#444'}'>{mm:02d}:{ss:02d}</h2>", unsafe_allow_html=True)
 
     today = datetime.datetime.now().strftime("%d/%m")
-    st.markdown(f"<div class='footer-sidebar'><b>Footer & Credits</b><br>by Vincenzo Autolitano • {today}</div>", unsafe_allow_html=True)
+    current_id_footer = st.session_state.current_row.get('ID Progressivo','') if st.session_state.current_row is not None else ''
+    
+    st.markdown(f"""
+    <div class='footer-sidebar'>
+        <b>v10.12 Ultimate</b> • {today}<br>
+        by Vincenzo Autolitano<br>
+        <a href='mailto:vincenzo.autolitano@gmail.com?subject=Errore ID {current_id_footer}'>⚠️ SEGNALA ERRORE</a>
+    </div>
+    """, unsafe_allow_html=True)
 
 # --- 9. INTERFACCIA PRINCIPALE ---
 current_icon = icon_map = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}.get(st.session_state.quiz_mode, '⚓')
 
 if st.session_state.stats_mode:
+    # --- VISUALIZZAZIONE STATISTICHE ---
     st.markdown(f"## 📊 Statistiche: {st.session_state.quiz_mode}")
     mem_data = []
     prefix = f"{st.session_state.quiz_mode}_"
@@ -357,6 +404,7 @@ if st.session_state.stats_mode:
             stats_grp['% Completamento'] = (stats_grp['Masterizzate'] / stats_grp['Totale'] * 100).astype(int)
             stats_grp = stats_grp.sort_values(by='% Completamento', ascending=False)
             
+            # Riga totali
             tot_q = stats_grp['Totale'].sum()
             tot_m = stats_grp['Masterizzate'].sum()
             tot_e = stats_grp['Errori'].sum()
@@ -381,9 +429,11 @@ if st.session_state.stats_mode:
     else: st.info("Nessun dato salvato.")
 
 else:
+    # --- HEADER ---
     title_suffix = "Ripasso" if st.session_state.review_mode else ("Simulazione Esame" if st.session_state.exam_mode else "Allenamento")
     st.markdown(f"## {current_icon} {st.session_state.quiz_mode} - *{title_suffix}*")
 
+    # --- PROGRESS BAR & METRICHE ---
     if not st.session_state.exam_finished:
         tot = st.session_state.score_ok + st.session_state.score_ko
         perc = int(st.session_state.score_ok / tot * 100) if tot > 0 else 0
@@ -395,37 +445,52 @@ else:
             st.progress(q_current / q_total)
             st.caption(f"📝 Domanda {q_current} di {q_total}")
 
+    # --- FINE SESSIONE ---
     if st.session_state.exam_finished:
+        
+        # CASO 1: RIPASSO ERRORI
         if st.session_state.review_mode:
             prefix = f"{st.session_state.quiz_mode}_"
             errors_left = 0
             for k, v in st.session_state.history.items():
                 if v == -1 and k.startswith(prefix):
                     errors_left += 1
+            
             st.markdown(f"""<div class="review-end"><h1>✅ Ripasso Completato</h1><p>Hai terminato questa serie di ripasso.</p></div>""", unsafe_allow_html=True)
+            
             if errors_left == 0:
                 st.success("COMPLIMENTI! Hai azzerato tutti gli errori in questa materia! 🏆")
             else:
                 st.info(f"⚠️ Nel database rimangono ancora **{errors_left}** errori da correggere.")
+            
             st.button("TORNA AL MENU", type="primary", on_click=reset_game, kwargs={'exam': False})
 
+        # CASO 2: SIMULAZIONE ESAME
         elif st.session_state.exam_mode:
             allowed_errors = 4 if "Base" in st.session_state.quiz_mode else 1
             passed = st.session_state.score_ko <= allowed_errors
+            
             if passed:
                 st.markdown(f"""<div class="exam-pass"><h1>🎉 SUPERATO! 🎉</h1><p>Hai fatto solo {st.session_state.score_ko} errori.</p></div>""", unsafe_allow_html=True)
                 st.balloons()
             else:
                 st.markdown(f"""<div class="exam-fail"><h1>🚫 NON SUPERATO</h1><p>Troppi errori ({st.session_state.score_ko}). Il massimo consentito è {allowed_errors}.</p></div>""", unsafe_allow_html=True)
+            
             st.button("🔄 NUOVA SIMULAZIONE", type="primary", on_click=reset_game, kwargs={'exam': True})
 
+    # --- DOMANDA CORRENTE ---
     elif st.session_state.current_row is not None:
         row = st.session_state.current_row
         
         if st.session_state.debug_mode:
             ukey = get_unique_key(row.get('ID Progressivo'))
             val = st.session_state.history.get(ukey)
-            st.caption(f"🔧 DEBUG: ID {row.get('ID Progressivo')} | Status: {val}")
+            w = calculate_weight(val)
+            status_text = "🆕 MAI VISTA"
+            if val == -1: status_text = "🔴 ERRORE ATTIVO"
+            elif val is not None and val > 0: status_text = f"🟢 CORRETTA {val} VOLTE"
+            
+            st.markdown(f"""<div class="debug-info">🔧 <b>DEBUG:</b> ID {row.get('ID Progressivo')} | Status: <b>{status_text}</b> | Peso: <b>{w:.2f}</b></div>""", unsafe_allow_html=True)
 
         if "Carteggio" in st.session_state.quiz_mode:
             st.markdown(f"**Esercizio {row.get('ID Progressivo')}**")
@@ -445,7 +510,9 @@ else:
                 if pth: st.image(Image.open(pth), use_container_width=True)
                 else: st.markdown("<div class='placeholder-img'>⚓<br>NO IMMAGINE</div>", unsafe_allow_html=True)
             with c2:
-                st.markdown(f"<div style='font-size:13px; color:#666; margin-bottom:5px'><b>ID {row.get('ID Progressivo')}</b> • {row.get('Argomento')}</div>", unsafe_allow_html=True)
+                # --- HEADER DOMANDA COMPLETO RIPRISTINATO (Voce inclusa) ---
+                st.markdown(f"<div style='font-size:13px; color:#666; margin-bottom:5px'><b>ID {row.get('ID Progressivo')}</b> • {row.get('Argomento')}<br><i>{row.get('Voce','')}</i></div>", unsafe_allow_html=True)
+                # -----------------------------------------------------------
                 st.markdown(f"<h3 style='margin-bottom:15px'>{row.get('Domanda')}</h3>", unsafe_allow_html=True)
                 
                 for i, opt in enumerate(st.session_state.shuffled_options):
