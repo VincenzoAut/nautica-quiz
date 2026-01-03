@@ -1,5 +1,6 @@
 streamlit
 pandas
+gspread
+google-auth
 openpyxl
 Pillow
-streamlit-local-storage
