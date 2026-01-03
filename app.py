@@ -65,7 +65,7 @@ if 'init' not in st.session_state:
     st.session_state.start_time = None
     st.session_state.exam_finished = False
     st.session_state.history = {}
-    st.session_state.debug_mode = False # Nuova variabile per il toggle
+    st.session_state.debug_mode = False
     st.session_state.init = True
 
 # AUTO-SYNC
@@ -73,7 +73,6 @@ if HAS_LOCAL_STORAGE and local_storage:
     time.sleep(0.1)
     browser_data = local_storage.getItem("nautica_history")
     if browser_data and len(browser_data) > 0 and st.session_state.history != browser_data:
-        # Migrazione silenziosa
         new_history = {}
         migrated = False
         for k, v in browser_data.items():
@@ -127,11 +126,10 @@ if db is None or len(db) == 0: st.stop()
 def get_unique_key(id_dom):
     return f"{st.session_state.quiz_mode}_{id_dom}"
 
-# FUNZIONE PER CALCOLARE IL PESO (Usata sia per estrarre che per visualizzare)
 def calculate_weight(val):
     if val is None: return 1.0       # Nuova
     if val == -1: return 10.0        # Errore
-    if val > 0: return 1.0 / (1.0 + val) # Corretta N volte (0.5, 0.33, 0.25...)
+    if val > 0: return 1.0 / (1.0 + val) 
     return 1.0
 
 def get_weighted_question(dataset, num=1):
@@ -255,25 +253,40 @@ with st.sidebar:
     
     st.divider()
     
-    # --- NUOVO: SEZIONE DEBUG / ANALYTICS ---
-    with st.expander("🧠 STATO MEMORIA (Debug)", expanded=False):
-        st.session_state.debug_mode = st.checkbox("🛠️ Mostra Pesi nei Quiz")
-        
-        # Statistiche veloci
-        total_mem = len([k for k in st.session_state.history if k.startswith(current_prefix)])
-        mastered = len([k for k,v in st.session_state.history.items() if k.startswith(current_prefix) and v > 0])
-        
-        st.markdown(f"**Totale visti in {st.session_state.quiz_mode}:** {total_mem}")
-        st.markdown(f"🔴 Errori attivi: {err_count}")
-        st.markdown(f"🟢 In apprendimento: {mastered}")
-        
-        if st.checkbox("Mostra Elenco Completo ID"):
-            st.write({k.replace(current_prefix, ""): v for k,v in st.session_state.history.items() if k.startswith(current_prefix)})
+    if st.session_state.exam_mode and st.session_state.start_time and not st.session_state.exam_finished:
+        mm, ss = divmod(int(time.time() - st.session_state.start_time), 60)
+        st.markdown(f"<h1 style='text-align:center; color:{'red' if mm>=20 else 'black'}'>{mm:02d}:{ss:02d}</h1>", unsafe_allow_html=True)
+        st.divider()
 
+    # --- NUOVA SEZIONE INFO COMPLETA ---
+    with st.expander("ℹ️ GUIDA E ISTRUZIONI", expanded=False):
+        st.markdown("""
+        **1. MODALITÀ DI STUDIO**
+        * 🎓 **Simulazione:** Simula l'esame reale (20 domande per Base, 5 per Vela/Carteggio). Alla fine vedrai l'esito.
+        * ♾️ **Allenamento:** Feedback immediato (Verde/Rosso) dopo ogni risposta. Ideale per studiare.
+
+        **2. MEMORIA INTELLIGENTE (SRS)**
+        L'app ricorda le tue prestazioni per ogni materia:
+        * 🔴 **Errori:** Se sbagli, la domanda viene marcata come "Critica" (Peso 10) e ti verrà chiesta molto spesso.
+        * 🟢 **Apprendimento:** Se indovini, la domanda apparirà sempre meno frequentemente (Peso decrescente).
+        * 🆕 **Nuove:** Hanno priorità normale.
+
+        **3. RIPASSO ERRORI**
+        Quando fai errori, appare un bottone rosso nella barra laterale. Usalo per fare una sessione dedicata solo alle domande che hai sbagliato. Se rispondi correttamente, l'errore viene cancellato.
+
+        **4. INSTALLAZIONE**
+        Su Android/iOS: Apri il menu del browser e seleziona **"Aggiungi a schermata Home"** per usare l'app a tutto schermo come una vera applicazione nativa.
+        """)
+
+    with st.expander("🧠 DEBUG DATI", expanded=False):
+        st.session_state.debug_mode = st.checkbox("🛠️ Mostra Pesi Tecnici")
+        total_mem = len([k for k in st.session_state.history if k.startswith(current_prefix)])
+        st.markdown(f"Domande in memoria: {total_mem}")
+        
     st.markdown("<br>", unsafe_allow_html=True)
     today = datetime.datetime.now().strftime("%d/%m/%Y")
     id_d = st.session_state.current_row.get('ID Progressivo','') if st.session_state.current_row is not None else ''
-    st.markdown(f"<div class='footer'><b>by Vincenzo Autolitano</b><br>v4.1 Analytics • {today}<br><a href='mailto:vincenzo.autolitano@gmail.com?subject=Errore ID {id_d}'>⚠️ SEGNALA ERRORE</a></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='footer'><b>by Vincenzo Autolitano</b><br>v4.2 Info Edition • {today}<br><a href='mailto:vincenzo.autolitano@gmail.com?subject=Errore ID {id_d}'>⚠️ SEGNALA ERRORE</a></div>", unsafe_allow_html=True)
 
 # --- 7. INTERFACCIA ---
 current_icon = icon_map = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}.get(st.session_state.quiz_mode, '⚓')
@@ -302,22 +315,15 @@ if st.session_state.exam_finished:
 elif st.session_state.current_row is not None:
     row = st.session_state.current_row
     
-    # --- VISUALIZZAZIONE DEBUG PESI (Se attivo) ---
     if st.session_state.debug_mode:
         id_dom = str(row.get('ID Progressivo'))
         ukey = get_unique_key(id_dom)
         val = st.session_state.history.get(ukey)
         w = calculate_weight(val)
-        
         status_text = "🆕 MAI VISTA"
         if val == -1: status_text = "🔴 ERRORE ATTIVO"
         elif val is not None and val > 0: status_text = f"🟢 CORRETTA {val} VOLTE"
-        
-        st.markdown(f"""
-        <div class="debug-info">
-            🔧 <b>DEBUG MODE:</b> ID {id_dom} | Stato: <b>{status_text}</b> | Peso Estrazione: <b>{w:.2f}</b>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"""<div class="debug-info">🔧 <b>DEBUG:</b> ID {id_dom} | Stato: <b>{status_text}</b> | Peso: <b>{w:.2f}</b></div>""", unsafe_allow_html=True)
 
     if "Carteggio" in st.session_state.quiz_mode:
         st.markdown(f"### Esercizio {row.get('ID Progressivo','')}")
