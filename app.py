@@ -4,6 +4,8 @@ import os
 import random
 import time
 import datetime
+import urllib.parse
+from PIL import Image
 
 # --- IMPORT LIBRERIA MEMORIA ---
 try:
@@ -13,7 +15,7 @@ except ImportError:
     HAS_LOCAL_STORAGE = False
 
 # --- 1. CONFIGURAZIONE ---
-st.set_page_config(page_title="Simulatore Patente", page_icon="⚓", layout="wide")
+st.set_page_config(page_title="Patente Nautica App Pro", page_icon="⚓", layout="wide")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_QUIZ_BASE = os.path.join(BASE_DIR, "Quiz_Patente_Base_Finale_OK.xlsx")
@@ -22,7 +24,6 @@ FILE_CARTEGGIO = os.path.join(BASE_DIR, "Quiz_Carteggio_Finale_OK.xlsx")
 FILE_RACCORDO = os.path.join(BASE_DIR, "Raccordoimmagini.xlsx")
 CARTELLA_IMMAGINI = os.path.join(BASE_DIR, "Immagini_Quiz")
 
-# Inizializza il componente (deve avere una key unica per non ricaricarsi all'infinito)
 local_storage = LocalStorage() if HAS_LOCAL_STORAGE else None
 
 # --- 2. CSS ---
@@ -43,11 +44,13 @@ st.markdown("""
     .stProgress > div > div > div > div { background-color: #1c7ed6; }
     .question-header { font-size: 14px; color: #333; background-color: #f1f3f5; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #1c7ed6; }
     .placeholder-img { width: 100%; height: auto; min-height: 180px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; flex-direction: column; border: 2px dashed #ddd; border-radius: 8px; color: #aaa; padding: 10px; }
+    /* Debug Box Style */
+    .debug-info { font-size: 12px; color: #666; background: #eee; padding: 8px; border-radius: 5px; margin-top: 10px; border: 1px dashed #999; }
     @media (max-width: 768px) { .metric-value { font-size: 16px; } }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. GESTIONE STATO E SYNC MEMORIA ---
+# --- 3. GESTIONE STATO ---
 if 'init' not in st.session_state:
     st.session_state.quiz_mode = "Quiz Base"
     st.session_state.exam_mode = False
@@ -61,19 +64,26 @@ if 'init' not in st.session_state:
     st.session_state.shuffled_options = []
     st.session_state.start_time = None
     st.session_state.exam_finished = False
-    st.session_state.history = {} # Parte vuota
+    st.session_state.history = {}
+    st.session_state.debug_mode = False # Nuova variabile per il toggle
     st.session_state.init = True
 
-# --- LOGICA AUTO-SYNC (IL FIX V3.5) ---
-# Questo codice gira a ogni refresh. Se trova dati nel browser che Python non ha, li carica e ricarica la pagina.
+# AUTO-SYNC
 if HAS_LOCAL_STORAGE and local_storage:
-    time.sleep(0.1) # Breve pausa per dare tempo al browser
+    time.sleep(0.1)
     browser_data = local_storage.getItem("nautica_history")
-    
-    # Se il browser ha dati MA la sessione è vuota (o diversa), sincronizza!
     if browser_data and len(browser_data) > 0 and st.session_state.history != browser_data:
-        st.session_state.history = browser_data
-        st.rerun() # Forza il ricaricamento della pagina per mostrare i dati aggiornati
+        # Migrazione silenziosa
+        new_history = {}
+        migrated = False
+        for k, v in browser_data.items():
+            if v == 'KO': new_history[k] = -1; migrated = True
+            elif v == 'OK': new_history[k] = 1; migrated = True
+            else: new_history[k] = v
+        
+        st.session_state.history = new_history
+        if migrated: local_storage.setItem("nautica_history", new_history)
+        st.rerun()
 
 # --- 4. CARICAMENTO DATI ---
 @st.cache_resource
@@ -96,10 +106,7 @@ def load_data(mode):
     try:
         df = pd.read_csv(f) if f.endswith('.csv') else pd.read_excel(f)
         df.columns = [str(c).strip() for c in df.columns]
-        
-        if 'ID Progressivo' in df.columns:
-            df['ID Progressivo'] = df['ID Progressivo'].astype(str)
-            
+        if 'ID Progressivo' in df.columns: df['ID Progressivo'] = df['ID Progressivo'].astype(str)
         if "Carteggio" not in mode:
             fr = FILE_RACCORDO
             if not os.path.exists(fr): fr = fr.replace(".xlsx", ".csv")
@@ -115,21 +122,28 @@ def load_data(mode):
 
 # --- 5. LOGICA DEL GIOCO ---
 db = load_data(st.session_state.quiz_mode)
-if db is None: st.error("Database non trovato."); st.stop()
+if db is None or len(db) == 0: st.stop()
 
 def get_unique_key(id_dom):
     return f"{st.session_state.quiz_mode}_{id_dom}"
+
+# FUNZIONE PER CALCOLARE IL PESO (Usata sia per estrarre che per visualizzare)
+def calculate_weight(val):
+    if val is None: return 1.0       # Nuova
+    if val == -1: return 10.0        # Errore
+    if val > 0: return 1.0 / (1.0 + val) # Corretta N volte (0.5, 0.33, 0.25...)
+    return 1.0
 
 def get_weighted_question(dataset, num=1):
     df = dataset.copy()
     def assign_weight(id_dom):
         unique_key = get_unique_key(id_dom)
-        status = st.session_state.history.get(unique_key)
-        if status == 'KO': return 10.0
-        if status == 'OK': return 0.5
-        return 1.0
+        val = st.session_state.history.get(unique_key)
+        return calculate_weight(val)
+    
     df['peso'] = df['ID Progressivo'].apply(assign_weight)
-    return df.sample(n=num, weights='peso')
+    safe_num = min(len(df), num)
+    return df.sample(n=safe_num, weights='peso')
 
 def reset_game(exam=False, review=False):
     st.session_state.exam_mode = exam
@@ -140,27 +154,27 @@ def reset_game(exam=False, review=False):
     st.session_state.answered = False
     st.session_state.exam_finished = False
     st.session_state.start_time = time.time() if exam else None
+    st.session_state.exam_questions = [] 
     
     if review:
         prefix = f"{st.session_state.quiz_mode}_"
         target_ids = []
         for key, val in st.session_state.history.items():
-            if val == 'KO' and key.startswith(prefix):
+            if val == -1 and key.startswith(prefix):
                 target_ids.append(key.replace(prefix, ""))
         
         filtered_db = db[db['ID Progressivo'].isin(target_ids)]
-        
         if len(filtered_db) == 0:
             st.warning(f"Nessun errore registrato in {st.session_state.quiz_mode}!")
             st.session_state.review_mode = False
             return
-
         st.session_state.exam_questions = filtered_db.sample(len(filtered_db)).to_dict('records')
         load_question()
 
     elif exam:
-        num = 5 if ("Carteggio" in st.session_state.quiz_mode or "Vela" in st.session_state.quiz_mode) else 20
-        st.session_state.exam_questions = get_weighted_question(db, min(len(db), num)).to_dict('records')
+        is_short_exam = "Carteggio" in st.session_state.quiz_mode or "Vela" in st.session_state.quiz_mode
+        num = 5 if is_short_exam else 20
+        st.session_state.exam_questions = get_weighted_question(db, num).to_dict('records')
         load_question()
     else:
         next_question()
@@ -175,7 +189,7 @@ def next_question():
         prepare_options()
 
 def load_question():
-    if st.session_state.exam_index < len(st.session_state.exam_questions):
+    if st.session_state.exam_questions and st.session_state.exam_index < len(st.session_state.exam_questions):
         st.session_state.current_row = st.session_state.exam_questions[st.session_state.exam_index]
         prepare_options()
     else: st.session_state.exam_finished = True
@@ -183,7 +197,7 @@ def load_question():
 def prepare_options():
     row = st.session_state.current_row
     if row is not None and "Carteggio" not in st.session_state.quiz_mode:
-        corretta = str(row['Risposta Esatta']).strip().upper()
+        corretta = str(row.get('Risposta Esatta','')).strip().upper()
         opts = [{'txt': row.get('Risposta A'), 'ok': corretta=='A'},
                 {'txt': row.get('Risposta B'), 'ok': corretta=='B'},
                 {'txt': row.get('Risposta C'), 'ok': corretta=='C'}]
@@ -194,11 +208,15 @@ def prepare_options():
 def answer(is_correct):
     if not st.session_state.answered:
         st.session_state.answered = True
-        
         id_dom = str(st.session_state.current_row.get('ID Progressivo'))
         unique_key = get_unique_key(id_dom)
+        current_val = st.session_state.history.get(unique_key)
         
-        st.session_state.history[unique_key] = 'OK' if is_correct else 'KO'
+        if is_correct:
+            if current_val is None or current_val == -1: st.session_state.history[unique_key] = 1
+            else: st.session_state.history[unique_key] = current_val + 1
+        else:
+            st.session_state.history[unique_key] = -1
         
         if HAS_LOCAL_STORAGE and local_storage:
             try: local_storage.setItem("nautica_history", st.session_state.history)
@@ -209,11 +227,11 @@ def answer(is_correct):
 
 # --- 6. SIDEBAR ---
 with st.sidebar:
-    st.title("⚓ NauticaApp Pro")
+    st.title("⚓ Patente Nautica App Pro")
     
     st.markdown("### 1. Modalità")
-    if st.button("🎓 SIMULAZIONE ESAME", type="primary"): reset_game(exam=True); st.rerun()
-    if st.button("♾️ ALLENAMENTO"): reset_game(exam=False); st.rerun()
+    st.button("🎓 SIMULAZIONE ESAME", type="primary", on_click=reset_game, kwargs={'exam': True})
+    st.button("♾️ ALLENAMENTO", on_click=reset_game, kwargs={'exam': False})
     
     st.divider()
     
@@ -221,70 +239,86 @@ with st.sidebar:
     if mode != st.session_state.quiz_mode:
         st.session_state.quiz_mode = mode
         st.session_state.current_row = None
+        st.session_state.exam_questions = []
+        st.session_state.exam_mode = False
+        st.session_state.review_mode = False
         st.rerun()
     
-    # CONTEGGIO ERRORI
     current_prefix = f"{st.session_state.quiz_mode}_"
     err_count = 0
     for k, v in st.session_state.history.items():
-        if v == 'KO' and k.startswith(current_prefix):
-            err_count += 1
+        if v == -1 and k.startswith(current_prefix): err_count += 1
 
     if err_count > 0:
-        st.error(f"⚠️ **{err_count} ERRORI IN MEMORIA**")
-        if st.button("🔄 RIPASSA ERRORI"):
-            reset_game(review=True)
-            st.rerun()
+        st.error(f"⚠️ **{err_count} ERRORI GRAVI**")
+        st.button("🔄 RIPASSA ERRORI", on_click=reset_game, kwargs={'review': True})
     
     st.divider()
     
-    if st.session_state.exam_mode and st.session_state.start_time and not st.session_state.exam_finished:
-        mm, ss = divmod(int(time.time() - st.session_state.start_time), 60)
-        st.markdown(f"<h1 style='text-align:center; color:{'red' if mm>=20 else 'black'}'>{mm:02d}:{ss:02d}</h1>", unsafe_allow_html=True)
-        st.divider()
+    # --- NUOVO: SEZIONE DEBUG / ANALYTICS ---
+    with st.expander("🧠 STATO MEMORIA (Debug)", expanded=False):
+        st.session_state.debug_mode = st.checkbox("🛠️ Mostra Pesi nei Quiz")
+        
+        # Statistiche veloci
+        total_mem = len([k for k in st.session_state.history if k.startswith(current_prefix)])
+        mastered = len([k for k,v in st.session_state.history.items() if k.startswith(current_prefix) and v > 0])
+        
+        st.markdown(f"**Totale visti in {st.session_state.quiz_mode}:** {total_mem}")
+        st.markdown(f"🔴 Errori attivi: {err_count}")
+        st.markdown(f"🟢 In apprendimento: {mastered}")
+        
+        if st.checkbox("Mostra Elenco Completo ID"):
+            st.write({k.replace(current_prefix, ""): v for k,v in st.session_state.history.items() if k.startswith(current_prefix)})
 
-    with st.expander("ℹ️ INFO E ISTRUZIONI", expanded=False):
-        st.markdown("**Benvenuti su NauticaApp Pro!**\n\n🧠 **Memoria Smart:**\nI tuoi errori vengono salvati automaticamente per il ripasso.")
-
+    st.markdown("<br>", unsafe_allow_html=True)
     today = datetime.datetime.now().strftime("%d/%m/%Y")
     id_d = st.session_state.current_row.get('ID Progressivo','') if st.session_state.current_row is not None else ''
-    st.markdown(f"<div class='footer'><b>by Vincenzo Autolitano</b><br>v3.5 AutoSync • {today}<br><a href='mailto:vincenzo.autolitano@gmail.com?subject=Errore ID {id_d}'>⚠️ SEGNALA ERRORE</a></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='footer'><b>by Vincenzo Autolitano</b><br>v4.1 Analytics • {today}<br><a href='mailto:vincenzo.autolitano@gmail.com?subject=Errore ID {id_d}'>⚠️ SEGNALA ERRORE</a></div>", unsafe_allow_html=True)
 
 # --- 7. INTERFACCIA ---
-from PIL import Image
-import urllib.parse
 current_icon = icon_map = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}.get(st.session_state.quiz_mode, '⚓')
-
 if st.session_state.review_mode: sub_title = "Ripasso Errori"
 elif st.session_state.exam_mode: sub_title = "Simulazione Esame"
 else: sub_title = "Allenamento"
-
 st.markdown(f"## {current_icon} **{st.session_state.quiz_mode}** - *{sub_title}*")
 
 if not st.session_state.exam_finished:
     tot = st.session_state.score_ok + st.session_state.score_ko
     perc = int(st.session_state.score_ok / tot * 100) if tot > 0 else 0
     st.markdown(f'<div class="metric-container"><div class="metric-box"><div class="metric-label">Esatte</div><div class="metric-value" style="color:green">{st.session_state.score_ok}</div></div><div class="metric-box"><div class="metric-label">Errate</div><div class="metric-value" style="color:red">{st.session_state.score_ko}</div></div><div class="metric-box"><div class="metric-label">%</div><div class="metric-value">{perc}%</div></div><div class="metric-box"><div class="metric-label">Totali</div><div class="metric-value">{tot}</div></div></div>', unsafe_allow_html=True)
-    
     if st.session_state.exam_mode or st.session_state.review_mode:
-        q_idx = st.session_state.exam_index + 1
-        q_max = len(st.session_state.exam_questions)
-        st.progress(q_idx / q_max)
-        st.caption(f"Domanda {q_idx} di {q_max}")
+        st.progress((st.session_state.exam_index + 1) / len(st.session_state.exam_questions))
 
 if st.session_state.exam_finished:
     if st.session_state.review_mode:
         st.markdown(f"<h1 style='text-align:center; color:blue'>RIPASSO COMPLETATO! 💪</h1>", unsafe_allow_html=True)
-        st.info("Errori corretti rimossi dalla memoria.")
+        st.info("Gli errori corretti ora appariranno con meno frequenza.")
     else:
         passed = st.session_state.score_ok >= 4 if "Vela" in st.session_state.quiz_mode or "Carteggio" in st.session_state.quiz_mode else st.session_state.score_ko <= 4
         st.markdown(f"<h1 style='text-align:center; color:{'green' if passed else 'red'}'>{'PROMOSSO! 🎉' if passed else 'NON IDONEO 🚫'}</h1>", unsafe_allow_html=True)
     st.markdown(f"<h3 style='text-align:center'>{st.session_state.score_ok} Esatte - {st.session_state.score_ko} Errate</h3>", unsafe_allow_html=True)
-    if st.button("🔄 NUOVA SIMULAZIONE", type="primary"): reset_game(exam=True); st.rerun()
+    st.button("🔄 NUOVA SIMULAZIONE", type="primary", on_click=reset_game, kwargs={'exam': True})
 
 elif st.session_state.current_row is not None:
     row = st.session_state.current_row
     
+    # --- VISUALIZZAZIONE DEBUG PESI (Se attivo) ---
+    if st.session_state.debug_mode:
+        id_dom = str(row.get('ID Progressivo'))
+        ukey = get_unique_key(id_dom)
+        val = st.session_state.history.get(ukey)
+        w = calculate_weight(val)
+        
+        status_text = "🆕 MAI VISTA"
+        if val == -1: status_text = "🔴 ERRORE ATTIVO"
+        elif val is not None and val > 0: status_text = f"🟢 CORRETTA {val} VOLTE"
+        
+        st.markdown(f"""
+        <div class="debug-info">
+            🔧 <b>DEBUG MODE:</b> ID {id_dom} | Stato: <b>{status_text}</b> | Peso Estrazione: <b>{w:.2f}</b>
+        </div>
+        """, unsafe_allow_html=True)
+
     if "Carteggio" in st.session_state.quiz_mode:
         st.markdown(f"### Esercizio {row.get('ID Progressivo','')}")
         st.markdown(f"<div class='scenario-box'>{row.get('Scenario', row.get('Domanda',''))}</div>", unsafe_allow_html=True)
@@ -297,6 +331,7 @@ elif st.session_state.current_row is not None:
             c1, c2 = st.columns(2); 
             if c1.button("✅ CORRETTO"): answer(True); next_question(); st.rerun()
             if c2.button("❌ ERRATO"): answer(False); next_question(); st.rerun()
+            
     else:
         c1, c2 = st.columns([1, 2])
         with c1:
@@ -317,4 +352,4 @@ elif st.session_state.current_row is not None:
                 st.markdown(f'<a href="https://www.google.com/search?q={q_url}" target="_blank" class="google-box">💡 <b>Approfondimento:</b> Cerca su Google</a>', unsafe_allow_html=True)
                 if st.button("PROSSIMA DOMANDA ➡", type="primary"): next_question(); st.rerun()
 
-if st.session_state.current_row is None: reset_game(exam=False); st.rerun()
+if st.session_state.current_row is None: reset_game(False); st.rerun()
