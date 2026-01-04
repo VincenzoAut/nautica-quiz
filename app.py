@@ -1,4 +1,4 @@
-# --- VERSIONE APP: v10.25 (UI Fixes & Layout Domanda) ---
+# --- VERSIONE APP: v10.26 (UI Fixes + Testi Login Ripristinati) ---
 import streamlit as st
 import pandas as pd
 import os
@@ -112,7 +112,7 @@ if os.path.exists(MAIN_BG_IMAGE):
 if os.path.exists(SIDEBAR_BG_IMAGE):
     add_sidebar_bg(SIDEBAR_BG_IMAGE)
 
-# CSS STILI GENERALI AGGIORNATI (v10.25)
+# CSS STILI GENERALI AGGIORNATI
 st.markdown("""
 <style>
     /* Layout Generale */
@@ -306,7 +306,7 @@ if st.session_state.current_user is None:
         st.markdown("""
         <div class="login-container">
             <div class="login-title">⚓ Patente Nautica App Pro</div>
-            <div class="login-subtitle">Cloud Edition v10.25</div>
+            <div class="login-subtitle">Cloud Edition v10.26</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -322,15 +322,21 @@ if st.session_state.current_user is None:
                     st.session_state.current_user = name_input
                     st.rerun()
         
+        # TESTO RIPRISTINATO COME DA VERSIONE 10.24
         with st.expander("ℹ️ INFO E GUIDA ALL'USO"):
             st.markdown("""
             **A cosa serve questa App?**
-            Questa applicazione è uno strumento professionale per supportarti nello studio dei quiz ministeriali per il conseguimento della **Patente Nautica**.
+            Questa applicazione è uno strumento professionale per supportarti nello studio dei quiz ministeriali per il conseguimento della **Patente Nautica** (Entro 12 miglia e Senza Limiti) presso le Capitanerie di Porto Italiane.
 
             **Come funziona:**
             * 🎓 **Simulazione Esame:** Riproduce l'esame reale.
-            * ♾️ **Allenamento Continuo:** Esercitazione libera.
+                * *Quiz Base:* 20 domande (Max 4 errori ammessi).
+                * *Vela / Carteggio:* 5 domande (Max 1 errore ammesso).
+            * ♾️ **Allenamento Continuo:** Esercitazione libera su tutto il database senza limiti di tempo.
             * 🔄 **Ripasso Errori:** Una modalità speciale per rivedere solo i quiz che hai sbagliato in passato.
+
+            **Metodo di Ripetizione Intelligente:**
+            L'algoritmo interno impara dalle tue risposte. I quiz a cui rispondi in modo errato vengono "marcati" e riproposti con maggiore frequenza rispetto a quelli che già conosci.
             """)
 
     st.markdown("""
@@ -514,7 +520,7 @@ with st.sidebar:
     
     st.markdown(f"""
     <div class='footer-sidebar'>
-        <b>v10.25 Ultimate</b> • {today}<br>
+        <b>v10.26 Ultimate</b> • {today}<br>
         by Vincenzo Autolitano<br>
         <a href='mailto:vincenzo.autolitano@gmail.com?subject={subject_email}'>⚠️ SEGNALA ERRORE</a>
     </div>
@@ -645,7 +651,7 @@ else:
                 if pth: st.image(Image.open(pth), use_container_width=True)
                 else: st.markdown("<div class='placeholder-img'>⚓<br>NO IMMAGINE</div>", unsafe_allow_html=True)
             with c2:
-                # --- QUIZ BOX SOLIDO AGGIORNATO (LAYOUT RICHIESTO) ---
+                # --- QUIZ BOX SOLIDO (LAYOUT AGGIORNATO E TESTI RIPRISTINATI) ---
                 st.markdown(f"""
                 <div class="question-box">
                     <div class="question-header">
