@@ -1,4 +1,4 @@
-# --- VERSIONE APP: v10.12 (Final Polished - Power Icon) ---
+# --- VERSIONE APP: v10.24 (Sidebar Image Background) ---
 import streamlit as st
 import pandas as pd
 import os
@@ -9,6 +9,7 @@ import urllib.parse
 import gspread
 from google.oauth2.service_account import Credentials
 from PIL import Image
+import base64
 
 # --- 1. CONFIGURAZIONE ---
 st.set_page_config(page_title="Patente Nautica App Pro", page_icon="⚓", layout="wide")
@@ -19,6 +20,10 @@ FILE_QUIZ_VELA = os.path.join(BASE_DIR, "Quiz_Patente_Vela_Finale_OK.xlsx")
 FILE_CARTEGGIO = os.path.join(BASE_DIR, "Quiz_Carteggio_Finale_OK.xlsx")
 FILE_RACCORDO = os.path.join(BASE_DIR, "Raccordoimmagini.xlsx")
 CARTELLA_IMMAGINI = os.path.join(BASE_DIR, "Immagini_Quiz")
+
+# NOMI FILES SFONDO
+MAIN_BG_IMAGE = "background.jpg"      # Sfondo Principale (Veliero)
+SIDEBAR_BG_IMAGE = "background2.jpg"  # Sfondo Sidebar (Mappa chiara)
 
 # --- 2. GESTIONE DATABASE (GOOGLE SHEETS) ---
 def get_google_sheet():
@@ -57,41 +62,124 @@ def save_answer_cloud(user, question_id, result):
         except: return False
     return False
 
-# --- 3. CSS ---
+# --- 3. CSS & GESTIONE SFONDI ---
+
+# Funzione per lo sfondo principale (Main App)
+def add_main_bg(image_file):
+    with open(image_file, "rb") as file:
+        encoded_string = base64.b64encode(file.read()).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url(data:image/{"jpg"};base64,{encoded_string});
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Funzione per lo sfondo della Sidebar
+def add_sidebar_bg(image_file):
+    with open(image_file, "rb") as file:
+        encoded_string = base64.b64encode(file.read()).decode()
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stSidebar"] {{
+            background-image: url(data:image/{"jpg"};base64,{encoded_string});
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }}
+        /* Rendi trasparente il div interno per vedere l'immagine */
+        [data-testid="stSidebar"] > div:first-child {{
+            background-color: transparent;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# APPLICAZIONE SFONDI (Se i file esistono)
+if os.path.exists(MAIN_BG_IMAGE):
+    add_main_bg(MAIN_BG_IMAGE)
+
+if os.path.exists(SIDEBAR_BG_IMAGE):
+    add_sidebar_bg(SIDEBAR_BG_IMAGE)
+
+# CSS STILI GENERALI
 st.markdown("""
 <style>
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
-    [data-testid="stSidebar"] { padding-top: 1rem; }
-    .metric-container { display: flex; justify-content: space-between; background-color: white; padding: 5px 10px; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); margin-bottom: 15px; border: 1px solid #e0e0e0; }
+    /* Layout Generale */
+    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; }
+    
+    /* Titoli */
+    h2 { color: white !important; text-shadow: 2px 2px 4px #000000; font-weight: 800 !important; }
+    
+    /* Metriche */
+    .metric-container { display: flex; justify-content: space-between; background-color: white; padding: 5px 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); margin-bottom: 15px; }
     .metric-box { text-align: center; width: 100%; }
     .metric-label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; }
     .metric-value { font-size: 18px; font-weight: 800; color: #333; }
-    .stButton button { width: 100%; border-radius: 8px; height: auto; padding: 10px; font-size: 16px; margin-bottom: 5px; }
     
-    /* Stile specifico per il bottone Esci (Power Icon) */
-    div[data-testid="column"] button { 
-        padding: 5px 0px; 
-        font-size: 20px; 
-        border: 1px solid #ddd;
-        background-color: transparent;
-        color: #d63384; /* Colore un po' acceso per il logout */
-        font-weight: bold;
-    }
-    div[data-testid="column"] button:hover {
-        background-color: #fce4ec;
-        border-color: #d63384;
+    /* Bottoni Sidebar (Migliorati per sfondo immagine) */
+    .stButton button { 
+        width: 100%; 
+        border-radius: 8px; 
+        height: auto; 
+        padding: 10px; 
+        font-size: 16px; 
+        margin-bottom: 5px; 
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        background-color: rgba(255, 255, 255, 0.9); /* Leggera trasparenza per leggere su mappa */
+        border: 1px solid #ccc;
     }
     
+    /* Bottone Esci */
+    div[data-testid="column"] button { padding: 5px 0px; font-size: 20px; border: 1px solid #ddd; background-color: transparent; color: #d63384; font-weight: bold; }
+    div[data-testid="column"] button:hover { background-color: #fce4ec; border-color: #d63384; }
+    
+    /* Box Risultati */
     .result-box { padding: 10px; border-radius: 6px; margin-bottom: 5px; color: #000; font-weight: 600; border: 1px solid rgba(0,0,0,0.1); font-size: 15px; }
-    .rank-box { background: linear-gradient(135deg, #0061f2 0%, #00c6f7 100%); padding: 15px; border-radius: 8px; color: white; text-align: center; margin-bottom: 20px; }
+    
+    /* Rank Box */
+    .rank-box { background: linear-gradient(135deg, #0061f2 0%, #00c6f7 100%); padding: 15px; border-radius: 8px; color: white; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
     .rank-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; font-weight: bold; }
     .rank-name { font-size: 22px; font-weight: 800; margin: 5px 0; }
-    .footer-sidebar { font-size: 11px; color: #888; text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #ddd; line-height: 1.5; }
-    .footer-sidebar a { color: #666; text-decoration: none; border-bottom: 1px dotted #999; }
     
+    /* Footer Sidebar */
+    .footer-sidebar { font-size: 11px; color: #444; text-align: center; margin-top: 30px; padding-top: 10px; border-top: 1px solid #999; line-height: 1.6; font-weight: 500; }
+    .footer-sidebar a { color: #0061f2; text-decoration: none; font-weight: bold; }
+    
+    /* Esiti */
     .exam-pass { background-color: #d4edda; color: #155724; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #c3e6cb; margin-bottom: 20px; }
     .exam-fail { background-color: #f8d7da; color: #721c24; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #f5c6cb; margin-bottom: 20px; }
     .review-end { background-color: #e2e3e5; color: #383d41; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #d6d8db; margin-bottom: 20px; }
+    
+    /* Login */
+    .login-container { background-color: rgba(255, 255, 255, 0.95); padding: 30px; border-radius: 15px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); text-align: center; border: 1px solid rgba(255, 255, 255, 0.18); }
+    .login-title { font-size: 32px; font-weight: 800; color: #0061f2; margin-bottom: 5px; }
+    .login-subtitle { font-size: 14px; color: #555; margin-bottom: 25px; font-weight: 500; }
+    .footer-login { position: fixed; bottom: 20px; right: 20px; text-align: right; color: white; font-size: 14px; font-weight: bold; background-color: rgba(0,0,0,0.5); padding: 10px 15px; border-radius: 10px; backdrop-filter: blur(5px); }
+    
+    /* --- BOX DOMANDA SOLIDO (AZZURRO PIATTO) --- */
+    .question-box {
+        background-color: #e3f2fd; /* Azzurro SOLIDO */
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 6px solid #1565c0; /* Bordo laterale scuro */
+        margin-bottom: 20px;
+        color: #0d47a1;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .question-id { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #1565c0; letter-spacing: 1px; margin-bottom: 5px; }
+    .question-text { font-size: 18px; font-weight: 700; line-height: 1.4; color: #0d47a1; }
+    .question-sub { font-size: 13px; color: #546e7a; font-style: italic; margin-bottom: 0px; }
     
     .debug-info { font-size: 11px; color: #495057; background: #e9ecef; padding: 5px; border-radius: 4px; margin-bottom: 10px; border: 1px dashed #adb5bd; }
 </style>
@@ -154,14 +242,17 @@ def load_data(mode):
 
 # --- 6. LOGIN ---
 if st.session_state.current_user is None:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown("<h1 style='text-align:center;'>⚓ Patente Nautica App Pro</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color:#666;'>Cloud Edition v10.12</p>", unsafe_allow_html=True)
-    
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        st.markdown("<div style='background:#f9f9f9; padding:20px; border-radius:10px; border:1px solid #ddd; text-align:center; margin-top:20px;'>Inserisci il tuo nome per accedere</div>", unsafe_allow_html=True)
-        name_input = st.text_input("Nome Allievo:", placeholder="Es. Vincenzo").strip()
+        st.markdown("""
+        <div class="login-container">
+            <div class="login-title">⚓ Patente Nautica App Pro</div>
+            <div class="login-subtitle">Cloud Edition v10.24</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        name_input = st.text_input("Inserisci il tuo nome per accedere:", placeholder="Es. Vincenzo").strip()
         if st.button("ACCEDI", type="primary"):
             if name_input:
                 with st.spinner("Accesso al database in corso..."):
@@ -169,9 +260,25 @@ if st.session_state.current_user is None:
                     st.session_state.history = hist
                     st.session_state.current_user = name_input
                     st.rerun()
+        
+        with st.expander("ℹ️ INFO E GUIDA ALL'USO"):
+            st.markdown("""
+            **A cosa serve questa App?**
+            Questa applicazione è uno strumento professionale per supportarti nello studio dei quiz ministeriali per il conseguimento della **Patente Nautica** (Entro 12 miglia e Senza Limiti) presso le Capitanerie di Porto Italiane.
+
+            **Come funziona:**
+            * 🎓 **Simulazione Esame:** Riproduce l'esame reale.
+                * *Quiz Base:* 20 domande (Max 4 errori ammessi).
+                * *Vela / Carteggio:* 5 domande (Max 1 errore ammesso).
+            * ♾️ **Allenamento Continuo:** Esercitazione libera su tutto il database senza limiti di tempo.
+            * 🔄 **Ripasso Errori:** Una modalità speciale per rivedere solo i quiz che hai sbagliato in passato.
+
+            **Metodo di Ripetizione Intelligente:**
+            L'algoritmo interno impara dalle tue risposte. I quiz a cui rispondi in modo errato vengono "marcati" e riproposti con maggiore frequenza rispetto a quelli che già conosci.
+            """)
 
     st.markdown("""
-    <div style='position:fixed; bottom:20px; right:20px; text-align:right; color:#aaa; font-size:12px;'>
+    <div class='footer-login'>
         <b>Footer & Credits</b><br>
         Developed by Vincenzo Autolitano
     </div>
@@ -284,11 +391,8 @@ def answer(is_correct):
 # --- 8. SIDEBAR ---
 with st.sidebar:
     st.title("⚓ Patente Nautica")
-    
-    # BOX UTENTE + ESCI ICONA (⏻)
     col_u1, col_u2 = st.columns([4,1])
-    with col_u1:
-        st.markdown(f"👤 **{st.session_state.current_user}**")
+    with col_u1: st.markdown(f"👤 **{st.session_state.current_user}**")
     with col_u2:
         if st.button("⏻", help="Esci / Disconnetti"):
             st.session_state.current_user = None
@@ -333,28 +437,13 @@ with st.sidebar:
     
     st.button("📊 STATISTICHE", on_click=reset_game, kwargs={'stats': True})
     
-    # --- INFO DETTAGLIATE RIPRISTINATE ---
-    with st.expander("ℹ️ GUIDA & INFO", expanded=False):
-        st.markdown("""
-        **Funzionamento App:**
-        * ☁️ **Cloud:** I progressi sono salvati automaticamente su Google Sheets.
-        * 🔄 **Sincronizzazione:** Puoi usare l'app da PC, Tablet o Smartphone ritrovando i tuoi dati.
-        
-        **Legenda:**
-        * 🟢 **Risposta Corretta:** +1 Punto Consolidation.
-        * 🔴 **Risposta Errata:** La domanda viene segnata come "Errore" (-1) e verrà riproposta più spesso.
-        """)
-    
     with st.expander("🧠 DEBUG MEMORIA", expanded=False):
         st.session_state.debug_mode = st.checkbox("🛠️ Attiva Debug Mode")
-        
         total_mem = len([k for k in st.session_state.history if k.startswith(current_prefix)])
         errors_debug = len([k for k,v in st.session_state.history.items() if k.startswith(current_prefix) and v == -1])
-        
         st.markdown(f"**Dati Tecnici:**")
         st.markdown(f"- Totale ID in memoria: {total_mem}")
         st.markdown(f"- Errori Attivi: {errors_debug}")
-        
         if st.checkbox("Mostra Elenco ID Completo"):
              debug_list = {k.replace(current_prefix, ""): v for k,v in st.session_state.history.items() if k.startswith(current_prefix)}
              st.write(debug_list)
@@ -364,13 +453,15 @@ with st.sidebar:
         st.markdown(f"<h2 style='text-align:center; color:{'red' if mm>=20 else '#444'}'>{mm:02d}:{ss:02d}</h2>", unsafe_allow_html=True)
 
     today = datetime.datetime.now().strftime("%d/%m")
-    current_id_footer = st.session_state.current_row.get('ID Progressivo','') if st.session_state.current_row is not None else ''
+    
+    # MAIL GENERICO CORRETTO
+    subject_email = urllib.parse.quote(f"Segnalazione Errori Patente Nautica App Pro")
     
     st.markdown(f"""
     <div class='footer-sidebar'>
-        <b>v10.12 Ultimate</b> • {today}<br>
+        <b>v10.24 Ultimate</b> • {today}<br>
         by Vincenzo Autolitano<br>
-        <a href='mailto:vincenzo.autolitano@gmail.com?subject=Errore ID {current_id_footer}'>⚠️ SEGNALA ERRORE</a>
+        <a href='mailto:vincenzo.autolitano@gmail.com?subject={subject_email}'>⚠️ SEGNALA ERRORE</a>
     </div>
     """, unsafe_allow_html=True)
 
@@ -378,7 +469,7 @@ with st.sidebar:
 current_icon = icon_map = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}.get(st.session_state.quiz_mode, '⚓')
 
 if st.session_state.stats_mode:
-    # --- VISUALIZZAZIONE STATISTICHE ---
+    st.markdown('<div class="question-card">', unsafe_allow_html=True)
     st.markdown(f"## 📊 Statistiche: {st.session_state.quiz_mode}")
     mem_data = []
     prefix = f"{st.session_state.quiz_mode}_"
@@ -404,7 +495,6 @@ if st.session_state.stats_mode:
             stats_grp['% Completamento'] = (stats_grp['Masterizzate'] / stats_grp['Totale'] * 100).astype(int)
             stats_grp = stats_grp.sort_values(by='% Completamento', ascending=False)
             
-            # Riga totali
             tot_q = stats_grp['Totale'].sum()
             tot_m = stats_grp['Masterizzate'].sum()
             tot_e = stats_grp['Errori'].sum()
@@ -427,13 +517,12 @@ if st.session_state.stats_mode:
                 }, hide_index=True, use_container_width=True)
         else: st.warning("Colonna 'Argomento' mancante.")
     else: st.info("Nessun dato salvato.")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 else:
-    # --- HEADER ---
     title_suffix = "Ripasso" if st.session_state.review_mode else ("Simulazione Esame" if st.session_state.exam_mode else "Allenamento")
     st.markdown(f"## {current_icon} {st.session_state.quiz_mode} - *{title_suffix}*")
 
-    # --- PROGRESS BAR & METRICHE ---
     if not st.session_state.exam_finished:
         tot = st.session_state.score_ok + st.session_state.score_ko
         perc = int(st.session_state.score_ok / tot * 100) if tot > 0 else 0
@@ -445,40 +534,32 @@ else:
             st.progress(q_current / q_total)
             st.caption(f"📝 Domanda {q_current} di {q_total}")
 
-    # --- FINE SESSIONE ---
     if st.session_state.exam_finished:
-        
-        # CASO 1: RIPASSO ERRORI
+        st.markdown('<div class="question-card">', unsafe_allow_html=True)
         if st.session_state.review_mode:
             prefix = f"{st.session_state.quiz_mode}_"
             errors_left = 0
             for k, v in st.session_state.history.items():
                 if v == -1 and k.startswith(prefix):
                     errors_left += 1
-            
             st.markdown(f"""<div class="review-end"><h1>✅ Ripasso Completato</h1><p>Hai terminato questa serie di ripasso.</p></div>""", unsafe_allow_html=True)
-            
             if errors_left == 0:
                 st.success("COMPLIMENTI! Hai azzerato tutti gli errori in questa materia! 🏆")
             else:
                 st.info(f"⚠️ Nel database rimangono ancora **{errors_left}** errori da correggere.")
-            
             st.button("TORNA AL MENU", type="primary", on_click=reset_game, kwargs={'exam': False})
 
-        # CASO 2: SIMULAZIONE ESAME
         elif st.session_state.exam_mode:
             allowed_errors = 4 if "Base" in st.session_state.quiz_mode else 1
             passed = st.session_state.score_ko <= allowed_errors
-            
             if passed:
                 st.markdown(f"""<div class="exam-pass"><h1>🎉 SUPERATO! 🎉</h1><p>Hai fatto solo {st.session_state.score_ko} errori.</p></div>""", unsafe_allow_html=True)
                 st.balloons()
             else:
                 st.markdown(f"""<div class="exam-fail"><h1>🚫 NON SUPERATO</h1><p>Troppi errori ({st.session_state.score_ko}). Il massimo consentito è {allowed_errors}.</p></div>""", unsafe_allow_html=True)
-            
             st.button("🔄 NUOVA SIMULAZIONE", type="primary", on_click=reset_game, kwargs={'exam': True})
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- DOMANDA CORRENTE ---
     elif st.session_state.current_row is not None:
         row = st.session_state.current_row
         
@@ -489,7 +570,6 @@ else:
             status_text = "🆕 MAI VISTA"
             if val == -1: status_text = "🔴 ERRORE ATTIVO"
             elif val is not None and val > 0: status_text = f"🟢 CORRETTA {val} VOLTE"
-            
             st.markdown(f"""<div class="debug-info">🔧 <b>DEBUG:</b> ID {row.get('ID Progressivo')} | Status: <b>{status_text}</b> | Peso: <b>{w:.2f}</b></div>""", unsafe_allow_html=True)
 
         if "Carteggio" in st.session_state.quiz_mode:
@@ -510,10 +590,14 @@ else:
                 if pth: st.image(Image.open(pth), use_container_width=True)
                 else: st.markdown("<div class='placeholder-img'>⚓<br>NO IMMAGINE</div>", unsafe_allow_html=True)
             with c2:
-                # --- HEADER DOMANDA COMPLETO RIPRISTINATO (Voce inclusa) ---
-                st.markdown(f"<div style='font-size:13px; color:#666; margin-bottom:5px'><b>ID {row.get('ID Progressivo')}</b> • {row.get('Argomento')}<br><i>{row.get('Voce','')}</i></div>", unsafe_allow_html=True)
-                # -----------------------------------------------------------
-                st.markdown(f"<h3 style='margin-bottom:15px'>{row.get('Domanda')}</h3>", unsafe_allow_html=True)
+                # --- QUIZ BOX SOLIDO ---
+                st.markdown(f"""
+                <div class="question-box">
+                    <div class="question-id">Domanda {row.get('ID Progressivo')}</div>
+                    <div class="question-text">{row.get('Domanda')}</div>
+                    <div class="question-sub">{row.get('Argomento')} - <i>{row.get('Voce','')}</i></div>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 for i, opt in enumerate(st.session_state.shuffled_options):
                     if st.session_state.answered:
@@ -528,7 +612,7 @@ else:
                 if st.session_state.answered:
                     q_url = urllib.parse.quote(f"Patente nautica spiegazione {row.get('Domanda','')}")
                     st.markdown(f'<a href="https://www.google.com/search?q={q_url}" target="_blank" class="google-box" style="text-align:center">💡 <b>Approfondimento:</b> Cerca su Google</a>', unsafe_allow_html=True)
-                    if st.button("PROSSIMA ➡", type="primary"): 
+                    if st.button("PROSSIMA DOMANDA ➡", type="primary"): 
                         next_question()
                         st.rerun()
 
