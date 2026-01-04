@@ -1,4 +1,4 @@
-# --- VERSIONE APP: v20.32 (Full Info Restored & Admin Features) ---
+# --- VERSIONE APP: v20.33 (Clean & Fixed) ---
 import streamlit as st
 import pandas as pd
 import os
@@ -13,8 +13,8 @@ import database as db_engine
 import logic as brain
 import ui 
 
-# --- 1. CONFIGURAZIONE ---
-st.set_page_config(page_title="Patente Nautica v20.32", page_icon="⚓", layout="wide")
+# --- 1. CONFIGURAZIONE (DEVE ESSERE LA PRIMA ISTRUZIONE STREAMLIT) ---
+st.set_page_config(page_title="Patente Nautica v20.33", page_icon="⚓", layout="wide")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_QUIZ_BASE = os.path.join(BASE_DIR, "Quiz_Patente_Base_Finale_OK.xlsx")
@@ -24,8 +24,9 @@ FILE_RACCORDO = os.path.join(BASE_DIR, "Raccordoimmagini.xlsx")
 CARTELLA_IMMAGINI = os.path.join(BASE_DIR, "Immagini_Quiz")
 
 # UI SETUP
-MAIN_BG_IMAGE = "background.jpg"
-SIDEBAR_BG_IMAGE = "background2.jpg"
+MAIN_BG_IMAGE = os.path.join(BASE_DIR, "background.jpg")
+SIDEBAR_BG_IMAGE = os.path.join(BASE_DIR, "background2.jpg")
+
 ui.set_backgrounds(MAIN_BG_IMAGE, SIDEBAR_BG_IMAGE)
 ui.load_css()
 
@@ -90,10 +91,9 @@ if st.session_state.current_user is None:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        ui.draw_login_header("v20.32 • Pro & Admin")
+        ui.draw_login_header("v20.33 • Pro & Admin")
         name_input = st.text_input("Inserisci il tuo nome per accedere:", placeholder="Es. Vincenzo").strip()
         
-        # LOGICA ADMIN SEGRETA
         if name_input.lower() == "admin":
             pwd = st.text_input("🔑 Password Ammiraglio:", type="password")
             if pwd == "nautica2025":
@@ -112,7 +112,6 @@ if st.session_state.current_user is None:
                         st.session_state.admin_mode = False
                         st.rerun()
         
-        # --- TESTO INFO RIPRISTINATO E COMPLETO ---
         with st.expander("ℹ️ INFO E GUIDA ALL'USO"):
             st.markdown("""
             **A cosa serve questa App?**
@@ -280,10 +279,11 @@ def answer(is_correct):
 # --- 6. SIDEBAR ---
 with st.sidebar:
     st.title("⚓ Patente Nautica")
-    col_u1, col_u2 = st.columns([4,1])
-    with col_u1: st.markdown(f"👤 **{st.session_state.current_user}**")
+    col_u1, col_u2 = st.columns([3, 2])
+    with col_u1: 
+        st.markdown(f"<div style='padding-top:5px;'>👤 <b>{st.session_state.current_user}</b></div>", unsafe_allow_html=True)
     with col_u2:
-        if st.button("🚪 ESCI", help="Logout"):
+        if st.button("🚪 Esci", key="logout_btn"):
             st.session_state.current_user = None
             st.rerun()
     
@@ -316,13 +316,13 @@ with st.sidebar:
     
     st.button("📊 STATISTICHE", on_click=reset_game, kwargs={'stats': True})
     
-    # --- MODULO SEGNALAZIONE ERRORI ---
     st.markdown("---")
     with st.expander("⚠️ SEGNALA ERRORE", expanded=False):
         with st.form("report_form"):
             st.caption("Hai trovato un errore in una domanda?")
             report_msg = st.text_area("Descrivi l'errore:", placeholder="Es. La risposta giusta è la B, non la A.")
             submitted = st.form_submit_button("Invia Segnalazione")
+            
             if submitted and report_msg:
                 curr_id = "Generico"
                 if st.session_state.current_row is not None:
@@ -332,7 +332,7 @@ with st.sidebar:
                 else: st.error("Errore invio.")
 
     today = datetime.datetime.now().strftime("%d/%m")
-    st.markdown(f"""<div class='footer-sidebar'><b>v20.32 Pro</b> • {today}<br>Developed by Vincenzo Autolitano</div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div class='footer-sidebar'><b>v20.33 Pro</b> • {today}<br>Developed by Vincenzo Autolitano</div>""", unsafe_allow_html=True)
 
 # --- 7. INTERFACCIA PRINCIPALE ---
 current_icon = icon_map = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}.get(st.session_state.quiz_mode, '⚓')
