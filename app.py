@@ -283,7 +283,7 @@ with st.sidebar:
     col_u1, col_u2 = st.columns([4,1])
     with col_u1: st.markdown(f"👤 **{st.session_state.current_user}**")
     with col_u2:
-        if st.button("⏻", help="Esci"):
+        if st.button("🚪 ESCI", help="Logout"):
             st.session_state.current_user = None
             st.rerun()
     
@@ -453,5 +453,4 @@ else:
 
     if st.session_state.current_row is None: 
         reset_game(False)
-
         st.rerun()
