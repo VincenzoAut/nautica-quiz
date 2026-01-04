@@ -1,4 +1,4 @@
-# --- VERSIONE APP: v10.26 (UI Fixes + Testi Login Ripristinati) ---
+# --- VERSIONE APP: v20.32 (Full Info Restored & Admin Features) ---
 import streamlit as st
 import pandas as pd
 import os
@@ -6,13 +6,15 @@ import time
 import datetime
 import random
 import urllib.parse
-import gspread
-from google.oauth2.service_account import Credentials
 from PIL import Image
-import base64
+
+# --- IMPORT MODULI PROPRIETARI ---
+import database as db_engine
+import logic as brain
+import ui 
 
 # --- 1. CONFIGURAZIONE ---
-st.set_page_config(page_title="Patente Nautica App Pro", page_icon="⚓", layout="wide")
+st.set_page_config(page_title="Patente Nautica v20.32", page_icon="⚓", layout="wide")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_QUIZ_BASE = os.path.join(BASE_DIR, "Quiz_Patente_Base_Finale_OK.xlsx")
@@ -21,235 +23,20 @@ FILE_CARTEGGIO = os.path.join(BASE_DIR, "Quiz_Carteggio_Finale_OK.xlsx")
 FILE_RACCORDO = os.path.join(BASE_DIR, "Raccordoimmagini.xlsx")
 CARTELLA_IMMAGINI = os.path.join(BASE_DIR, "Immagini_Quiz")
 
-# NOMI FILES SFONDO
-MAIN_BG_IMAGE = "background.jpg"      # Sfondo Principale (Veliero)
-SIDEBAR_BG_IMAGE = "background2.jpg"  # Sfondo Sidebar (Mappa chiara)
+# UI SETUP
+MAIN_BG_IMAGE = "background.jpg"
+SIDEBAR_BG_IMAGE = "background2.jpg"
+ui.set_backgrounds(MAIN_BG_IMAGE, SIDEBAR_BG_IMAGE)
+ui.load_css()
 
-# --- 2. GESTIONE DATABASE (GOOGLE SHEETS) ---
-def get_google_sheet():
-    try:
-        scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-            secrets_dict = dict(st.secrets["connections"]["gsheets"])
-        else: return None
-        creds = Credentials.from_service_account_info(secrets_dict, scopes=scopes)
-        client = gspread.authorize(creds)
-        return client.open_by_url(secrets_dict["spreadsheet"]).sheet1 
-    except: return None
-
-def load_user_history(username):
-    ws = get_google_sheet()
-    if ws:
-        try:
-            records = ws.get_all_records()
-            history = {}
-            for row in records:
-                r_user = str(row.get('Utente', row.get('utente', '')))
-                r_id = str(row.get('ID_Domanda', row.get('id_domanda', '')))
-                r_esito = row.get('Esito', row.get('esito', 0))
-                if r_user.lower() == username.lower():
-                    history[r_id] = int(r_esito)
-            return history
-        except: return {}
-    return {}
-
-def save_answer_cloud(user, question_id, result):
-    ws = get_google_sheet()
-    if ws:
-        try:
-            ws.append_row([user, question_id, result])
-            return True
-        except: return False
-    return False
-
-# --- 3. CSS & GESTIONE SFONDI ---
-
-# Funzione per lo sfondo principale (Main App)
-def add_main_bg(image_file):
-    with open(image_file, "rb") as file:
-        encoded_string = base64.b64encode(file.read()).decode()
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url(data:image/{"jpg"};base64,{encoded_string});
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-# Funzione per lo sfondo della Sidebar
-def add_sidebar_bg(image_file):
-    with open(image_file, "rb") as file:
-        encoded_string = base64.b64encode(file.read()).decode()
-    st.markdown(
-        f"""
-        <style>
-        [data-testid="stSidebar"] {{
-            background-image: url(data:image/{"jpg"};base64,{encoded_string});
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }}
-        /* Rendi trasparente il div interno per vedere l'immagine */
-        [data-testid="stSidebar"] > div:first-child {{
-            background-color: transparent;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-# APPLICAZIONE SFONDI (Se i file esistono)
-if os.path.exists(MAIN_BG_IMAGE):
-    add_main_bg(MAIN_BG_IMAGE)
-
-if os.path.exists(SIDEBAR_BG_IMAGE):
-    add_sidebar_bg(SIDEBAR_BG_IMAGE)
-
-# CSS STILI GENERALI AGGIORNATI
-st.markdown("""
-<style>
-    /* Layout Generale */
-    .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; }
-    
-    /* --- BOTTONI (Correzione Visibilità) --- */
-    /* Stile base per TUTTI i bottoni */
-    div.stButton > button {
-        width: 100%; 
-        border-radius: 8px; 
-        height: auto; 
-        padding: 12px; 
-        font-size: 16px; 
-        margin-bottom: 5px; 
-        background-color: #ffffff !important; /* Sfondo Bianco Solido SEMPRE */
-        border: 1px solid #ced4da !important; /* Bordo Grigio visibile */
-        color: #212529 !important; /* Testo Scuro */
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        transition: all 0.2s ease;
-    }
-    
-    /* Effetto Hover (quando passi sopra) */
-    div.stButton > button:hover {
-        border-color: #0d6efd !important;
-        color: #0d6efd !important;
-        background-color: #f8f9fa !important;
-        transform: translateY(-1px);
-    }
-
-    /* --- BOTTONE PRIMARIO (ACCEDI / NUOVA SIMULAZIONE) --- */
-    div.stButton > button[kind="primary"] {
-        background-color: #ff4b4b !important; 
-        color: white !important;
-        border: none !important;
-        font-weight: bold !important;
-        font-size: 18px !important; 
-        padding: 15px !important; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-    }
-
-    div.stButton > button[kind="primary"]:hover {
-        background-color: #ff3333 !important;
-        box-shadow: 0 6px 8px rgba(0,0,0,0.3);
-    }
-
-    /* --- TITOLI E TESTI --- */
-    h2 { color: white !important; text-shadow: 2px 2px 4px #000000; font-weight: 800 !important; }
-    
-    /* --- BOX DOMANDA AGGIORNATO (Argomento in alto) --- */
-    .question-box {
-        background-color: #e3f2fd;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 6px solid #1565c0;
-        margin-bottom: 20px;
-        color: #0d47a1;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    
-    /* Intestazione Domanda */
-    .question-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px;
-        border-bottom: 1px solid rgba(13, 71, 161, 0.2);
-        padding-bottom: 8px;
-        flex-wrap: wrap;
-    }
-    
-    .question-id { 
-        font-size: 14px; 
-        font-weight: 900; 
-        color: #1565c0; 
-        text-transform: uppercase; 
-        letter-spacing: 0.5px;
-    }
-    
-    .question-topic {
-        font-size: 13px;
-        color: #455a64;
-        font-style: italic;
-        text-align: right;
-        font-weight: 600;
-    }
-
-    .question-text { 
-        font-size: 20px; 
-        font-weight: 700; 
-        line-height: 1.5; 
-        color: #0d47a1; 
-    }
-    
-    /* Metriche */
-    .metric-container { display: flex; justify-content: space-between; background-color: white; padding: 5px 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); margin-bottom: 15px; }
-    .metric-box { text-align: center; width: 100%; }
-    .metric-label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; }
-    .metric-value { font-size: 18px; font-weight: 800; color: #333; }
-    
-    /* Bottone Esci */
-    div[data-testid="column"] button { padding: 5px 0px; font-size: 20px; border: 1px solid #ddd; background-color: transparent !important; color: #d63384 !important; font-weight: bold; }
-    div[data-testid="column"] button:hover { background-color: #fce4ec !important; border-color: #d63384 !important; }
-    
-    /* Box Risultati */
-    .result-box { padding: 10px; border-radius: 6px; margin-bottom: 5px; color: #000; font-weight: 600; border: 1px solid rgba(0,0,0,0.1); font-size: 15px; }
-    
-    /* Rank Box */
-    .rank-box { background: linear-gradient(135deg, #0061f2 0%, #00c6f7 100%); padding: 15px; border-radius: 8px; color: white; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-    .rank-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; font-weight: bold; }
-    .rank-name { font-size: 22px; font-weight: 800; margin: 5px 0; }
-    
-    /* Footer Sidebar */
-    .footer-sidebar { font-size: 11px; color: #444; text-align: center; margin-top: 30px; padding-top: 10px; border-top: 1px solid #999; line-height: 1.6; font-weight: 500; }
-    .footer-sidebar a { color: #0061f2; text-decoration: none; font-weight: bold; }
-    
-    /* Esiti */
-    .exam-pass { background-color: #d4edda; color: #155724; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #c3e6cb; margin-bottom: 20px; }
-    .exam-fail { background-color: #f8d7da; color: #721c24; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #f5c6cb; margin-bottom: 20px; }
-    .review-end { background-color: #e2e3e5; color: #383d41; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #d6d8db; margin-bottom: 20px; }
-    
-    /* Login */
-    .login-container { background-color: rgba(255, 255, 255, 0.95); padding: 30px; border-radius: 15px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); text-align: center; border: 1px solid rgba(255, 255, 255, 0.18); }
-    .login-title { font-size: 32px; font-weight: 800; color: #0061f2; margin-bottom: 5px; }
-    .login-subtitle { font-size: 14px; color: #555; margin-bottom: 25px; font-weight: 500; }
-    .footer-login { position: fixed; bottom: 20px; right: 20px; text-align: right; color: white; font-size: 14px; font-weight: bold; background-color: rgba(0,0,0,0.5); padding: 10px 15px; border-radius: 10px; backdrop-filter: blur(5px); }
-    
-    .debug-info { font-size: 11px; color: #495057; background: #e9ecef; padding: 5px; border-radius: 4px; margin-bottom: 10px; border: 1px dashed #adb5bd; }
-</style>
-""", unsafe_allow_html=True)
-
-# --- 4. GESTIONE STATO ---
+# --- 2. GESTIONE STATO ---
 if 'init' not in st.session_state:
     st.session_state.current_user = None
     st.session_state.quiz_mode = "Quiz Base"
     st.session_state.exam_mode = False
     st.session_state.review_mode = False
     st.session_state.stats_mode = False
+    st.session_state.admin_mode = False
     st.session_state.score_ok = 0
     st.session_state.score_ko = 0
     st.session_state.exam_index = 0
@@ -259,11 +46,11 @@ if 'init' not in st.session_state:
     st.session_state.shuffled_options = []
     st.session_state.start_time = None
     st.session_state.exam_finished = False
-    st.session_state.history = {}
+    st.session_state.history = {} 
     st.session_state.debug_mode = False
     st.session_state.init = True
 
-# --- 5. CARICAMENTO DATI ---
+# --- 3. CARICAMENTO DATI ---
 @st.cache_resource
 def get_image_index():
     index = {}
@@ -298,31 +85,34 @@ def load_data(mode):
         return df
     except: return None
 
-# --- 6. LOGIN ---
+# --- 4. LOGIN & ADMIN ---
 if st.session_state.current_user is None:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        st.markdown("""
-        <div class="login-container">
-            <div class="login-title">⚓ Patente Nautica App Pro</div>
-            <div class="login-subtitle">Cloud Edition v10.26</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
+        ui.draw_login_header("v20.32 • Pro & Admin")
         name_input = st.text_input("Inserisci il tuo nome per accedere:", placeholder="Es. Vincenzo").strip()
-        st.markdown("<br>", unsafe_allow_html=True)
         
-        # AGGIORNATO: use_container_width=True per bottone grande
-        if st.button("ACCEDI AL SISTEMA", type="primary", use_container_width=True):
-            if name_input:
-                with st.spinner("Accesso al database in corso..."):
-                    hist = load_user_history(name_input)
-                    st.session_state.history = hist
-                    st.session_state.current_user = name_input
+        # LOGICA ADMIN SEGRETA
+        if name_input.lower() == "admin":
+            pwd = st.text_input("🔑 Password Ammiraglio:", type="password")
+            if pwd == "nautica2025":
+                if st.button("ENTRA IN PLANCIA", type="primary", use_container_width=True):
+                    st.session_state.current_user = "Ammiraglio"
+                    st.session_state.admin_mode = True
                     st.rerun()
+        else:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("ACCEDI AL SISTEMA", type="primary", use_container_width=True):
+                if name_input:
+                    with st.spinner("Caricamento Profilo Utente..."):
+                        hist = db_engine.fetch_user_history(name_input)
+                        st.session_state.history = hist
+                        st.session_state.current_user = name_input
+                        st.session_state.admin_mode = False
+                        st.rerun()
         
-        # TESTO RIPRISTINATO COME DA VERSIONE 10.24
+        # --- TESTO INFO RIPRISTINATO E COMPLETO ---
         with st.expander("ℹ️ INFO E GUIDA ALL'USO"):
             st.markdown("""
             **A cosa serve questa App?**
@@ -332,32 +122,81 @@ if st.session_state.current_user is None:
             * 🎓 **Simulazione Esame:** Riproduce l'esame reale.
                 * *Quiz Base:* 20 domande (Max 4 errori ammessi).
                 * *Vela / Carteggio:* 5 domande (Max 1 errore ammesso).
-            * ♾️ **Allenamento Continuo:** Esercitazione libera su tutto il database senza limiti di tempo.
-            * 🔄 **Ripasso Errori:** Una modalità speciale per rivedere solo i quiz che hai sbagliato in passato.
+            * ♾️ **Allenamento Continuo:** Esercitazione libera su tutto il database.
+            * 🔄 **Ripasso Errori:** Una modalità speciale per rivedere solo i quiz che hai sbagliato.
 
-            **Metodo di Ripetizione Intelligente:**
-            L'algoritmo interno impara dalle tue risposte. I quiz a cui rispondi in modo errato vengono "marcati" e riproposti con maggiore frequenza rispetto a quelli che già conosci.
+            **🆕 Novità v20: Metodo SRS (Spaced Repetition)**
+            L'algoritmo intelligente ti interroga quando stai per dimenticare:
+            * Se sbagli 🔴 -> Ti interrogo domani.
+            * Se indovini 🟢 (1 volta) -> Ti interrogo tra 3 giorni.
+            * Se indovini 🟢🟢 (2 volte) -> Ti interrogo tra 7 giorni.
+            * Se sei esperto 🎓 -> Ti interrogo tra 15 giorni.
             """)
-
-    st.markdown("""
-    <div class='footer-login'>
-        <b>Footer & Credits</b><br>
-        Developed by Vincenzo Autolitano
-    </div>
-    """, unsafe_allow_html=True)
+    ui.draw_login_footer()
     st.stop()
 
-# --- 7. LOGICA GIOCO ---
+# --- 5. LOGICA GIOCO E AMMIRAGLIO ---
 db = load_data(st.session_state.quiz_mode)
+
+# === SEZIONE ADMIN (AMMIRAGLIO) ===
+if st.session_state.admin_mode:
+    st.markdown("## 👮‍♂️ Plancia Ammiraglio (Admin Dashboard)")
+    if st.button("Esci da Admin"):
+        st.session_state.current_user = None
+        st.session_state.admin_mode = False
+        st.rerun()
+    
+    st.info("Monitoraggio attività studenti.")
+    
+    all_data = db_engine.fetch_all_stats()
+    if all_data:
+        df_all = pd.DataFrame(all_data)
+        
+        if 'Timestamp' in df_all.columns:
+            df_all['DT'] = pd.to_datetime(df_all['Timestamp'])
+            df_all['Giorno'] = df_all['DT'].dt.date
+        else:
+            df_all['DT'] = datetime.datetime.now()
+            df_all['Giorno'] = datetime.date.today()
+
+        tot_answers = len(df_all)
+        tot_users = df_all['Utente'].nunique()
+        last_active_str = df_all['DT'].max().strftime("%d/%m/%Y %H:%M")
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Studenti Iscritti", tot_users)
+        c2.metric("Quiz Totali Svolti", tot_answers)
+        c3.metric("Ultimo Ingresso", last_active_str)
+        
+        st.divider()
+        st.markdown("### 🏆 Classifica & Attività")
+        
+        summary = df_all.groupby('Utente').agg(
+            Domande_Svolte=('Esito', 'count'),
+            Giorni_Attività=('Giorno', 'nunique'),
+            Ultimo_Accesso=('DT', 'max')
+        ).reset_index().sort_values('Ultimo_Accesso', ascending=False)
+        
+        st.dataframe(
+            summary,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Utente": st.column_config.TextColumn("Studente", width="medium"),
+                "Domande_Svolte": st.column_config.NumberColumn("Quiz Fatti", format="%d"),
+                "Giorni_Attività": st.column_config.NumberColumn("Giorni Studio", help="Giorni diversi di collegamento"),
+                "Ultimo_Accesso": st.column_config.DatetimeColumn("Ultima Attività", format="DD/MM/YYYY HH:mm")
+            }
+        )
+        
+        with st.expander("🔍 Vedi Log Completo (Raw Data)"):
+            st.dataframe(df_all.sort_values('Timestamp', ascending=False).head(200), use_container_width=True)
+    else:
+        st.warning("Database vuoto o errore connessione.")
+    st.stop() 
+
+# === SEZIONE UTENTE NORMALE ===
 if db is None or len(db) == 0: st.stop()
-
-def get_unique_key(id_dom): return f"{st.session_state.quiz_mode}_{id_dom}"
-
-def calculate_weight(val):
-    if val is None: return 1.0        
-    if val == -1: return 10.0          
-    if val > 0: return 1.0 / (1.0 + val) 
-    return 1.0
 
 def get_user_rank(mastered_count):
     if mastered_count < 100: return "🧹 Mozzo", 100
@@ -365,15 +204,6 @@ def get_user_rank(mastered_count):
     if mastered_count < 500: return "🧭 Nostromo", 500
     if mastered_count < 700: return "🛳️ Comandante", 700
     return "🐺 Lupo di Mare", 1000
-
-def get_weighted_question(dataset, num=1):
-    df = dataset.copy()
-    def assign_weight(id_dom):
-        unique_key = get_unique_key(id_dom)
-        val = st.session_state.history.get(unique_key)
-        return calculate_weight(val)
-    df['peso'] = df['ID Progressivo'].apply(assign_weight)
-    return df.sample(n=min(len(df), num), weights='peso')
 
 def reset_game(exam=False, review=False, stats=False):
     st.session_state.exam_mode = exam
@@ -389,33 +219,34 @@ def reset_game(exam=False, review=False, stats=False):
     
     if not stats:
         if review:
-            prefix = f"{st.session_state.quiz_mode}_"
-            target_ids = []
-            for key, val in st.session_state.history.items():
-                if val == -1 and key.startswith(prefix):
-                    target_ids.append(key.replace(prefix, ""))
-            filtered_db = db[db['ID Progressivo'].isin(target_ids)]
-            if len(filtered_db) == 0:
-                st.warning("Nessun errore da ripassare!")
+            subset = brain.get_next_session_questions(db, st.session_state.history, mode="Ripasso")
+            if len(subset) == 0:
+                st.success("🎉 Nessun ripasso in scadenza!")
                 st.session_state.review_mode = False
                 return
-            st.session_state.exam_questions = filtered_db.sample(len(filtered_db)).to_dict('records')
+            st.session_state.exam_questions = subset.to_dict('records')
             load_question()
         elif exam:
             num = 5 if ("Carteggio" in st.session_state.quiz_mode or "Vela" in st.session_state.quiz_mode) else 20
-            st.session_state.exam_questions = get_weighted_question(db, num).to_dict('records')
+            st.session_state.exam_questions = db.sample(num).to_dict('records')
             load_question()
         else:
-            next_question()
+            subset = brain.get_next_session_questions(db, st.session_state.history, mode="Allenamento")
+            st.session_state.exam_questions = subset.to_dict('records')
+            load_question()
 
 def next_question():
     st.session_state.answered = False
-    if st.session_state.exam_mode or st.session_state.review_mode:
+    if st.session_state.exam_index + 1 < len(st.session_state.exam_questions):
         st.session_state.exam_index += 1
         load_question()
-    elif len(db) > 0:
-        st.session_state.current_row = get_weighted_question(db, 1).iloc[0]
-        prepare_options()
+    elif not st.session_state.exam_mode and not st.session_state.review_mode:
+        st.session_state.exam_index = 0
+        subset = brain.get_next_session_questions(db, st.session_state.history, mode="Allenamento")
+        st.session_state.exam_questions = subset.to_dict('records')
+        load_question()
+    else:
+        st.session_state.exam_finished = True
 
 def load_question():
     if st.session_state.exam_questions and st.session_state.exam_index < len(st.session_state.exam_questions):
@@ -438,39 +269,27 @@ def answer(is_correct):
     if not st.session_state.answered:
         st.session_state.answered = True
         id_dom = str(st.session_state.current_row.get('ID Progressivo'))
-        unique_key = get_unique_key(id_dom)
-        current_val = st.session_state.history.get(unique_key)
-        new_val = 1
-        if is_correct:
-            new_val = 1 if (current_val is None or current_val == -1) else current_val + 1
-        else:
-            new_val = -1
-        st.session_state.history[unique_key] = new_val
-        save_answer_cloud(st.session_state.current_user, unique_key, new_val)
+        item_data = st.session_state.history.get(id_dom, {'score': 0, 'date': ''})
+        new_score = 1 if is_correct else -1
+        if is_correct and item_data['score'] > 0: new_score = item_data['score'] + 1
+        st.session_state.history[id_dom] = {'score': new_score, 'date': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        db_engine.upsert_answer(st.session_state.current_user, id_dom, new_score)
         if is_correct: st.session_state.score_ok += 1
         else: st.session_state.score_ko += 1
 
-# --- 8. SIDEBAR ---
+# --- 6. SIDEBAR ---
 with st.sidebar:
     st.title("⚓ Patente Nautica")
     col_u1, col_u2 = st.columns([4,1])
     with col_u1: st.markdown(f"👤 **{st.session_state.current_user}**")
     with col_u2:
-        if st.button("⏻", help="Esci / Disconnetti"):
+        if st.button("⏻", help="Esci"):
             st.session_state.current_user = None
             st.rerun()
     
-    current_prefix = f"{st.session_state.quiz_mode}_"
-    mastered_count = len([k for k, v in st.session_state.history.items() if k.startswith(current_prefix) and v > 0])
+    mastered_count = len([v for v in st.session_state.history.values() if v['score'] > 0])
     rank_name, rank_target = get_user_rank(mastered_count)
-    
-    st.markdown(f"""
-    <div class="rank-box">
-        <div class="rank-title">IL TUO GRADO</div>
-        <div class="rank-name">{rank_name}</div>
-        <div class="rank-next">{mastered_count} / {rank_target} Consolidate</div>
-    </div>
-    """, unsafe_allow_html=True)
+    ui.draw_rank_box(rank_name, mastered_count, rank_target)
     st.progress(min(mastered_count / rank_target, 1.0))
 
     st.markdown("### 1. Scegli Materia:")
@@ -486,152 +305,118 @@ with st.sidebar:
 
     st.markdown("### 2. Azione:")
     st.button("🎓 SIMULAZIONE ESAME", type="primary", on_click=reset_game, kwargs={'exam': True})
-    st.button("♾️ ALLENAMENTO", on_click=reset_game, kwargs={'exam': False})
-    
+    st.button("♾️ ALLENAMENTO SMART", on_click=reset_game, kwargs={'exam': False})
     st.divider()
     
-    err_count = 0
-    for k, v in st.session_state.history.items():
-        if v == -1 and k.startswith(current_prefix): err_count += 1
+    current_ids = set(db['ID Progressivo'].astype(str))
+    err_count = len([k for k, v in st.session_state.history.items() if v['score'] == -1 and k in current_ids])
     if err_count > 0:
-        st.error(f"⚠️ **{err_count} Errori**")
+        st.error(f"⚠️ **{err_count} Errori Attivi**")
         st.button("🔄 RIPASSA ERRORI", on_click=reset_game, kwargs={'review': True})
     
     st.button("📊 STATISTICHE", on_click=reset_game, kwargs={'stats': True})
     
-    with st.expander("🧠 DEBUG MEMORIA", expanded=False):
-        st.session_state.debug_mode = st.checkbox("🛠️ Attiva Debug Mode")
-        total_mem = len([k for k in st.session_state.history if k.startswith(current_prefix)])
-        errors_debug = len([k for k,v in st.session_state.history.items() if k.startswith(current_prefix) and v == -1])
-        st.markdown(f"**Dati Tecnici:**")
-        st.markdown(f"- Totale ID in memoria: {total_mem}")
-        st.markdown(f"- Errori Attivi: {errors_debug}")
-        if st.checkbox("Mostra Elenco ID Completo"):
-             debug_list = {k.replace(current_prefix, ""): v for k,v in st.session_state.history.items() if k.startswith(current_prefix)}
-             st.write(debug_list)
-    
-    if st.session_state.exam_mode and st.session_state.start_time and not st.session_state.exam_finished:
-        mm, ss = divmod(int(time.time() - st.session_state.start_time), 60)
-        st.markdown(f"<h2 style='text-align:center; color:{'red' if mm>=20 else '#444'}'>{mm:02d}:{ss:02d}</h2>", unsafe_allow_html=True)
+    # --- MODULO SEGNALAZIONE ERRORI ---
+    st.markdown("---")
+    with st.expander("⚠️ SEGNALA ERRORE", expanded=False):
+        with st.form("report_form"):
+            st.caption("Hai trovato un errore in una domanda?")
+            report_msg = st.text_area("Descrivi l'errore:", placeholder="Es. La risposta giusta è la B, non la A.")
+            submitted = st.form_submit_button("Invia Segnalazione")
+            if submitted and report_msg:
+                curr_id = "Generico"
+                if st.session_state.current_row is not None:
+                    curr_id = str(st.session_state.current_row.get('ID Progressivo', 'Generico'))
+                ok = db_engine.save_report_to_db(st.session_state.current_user, curr_id, report_msg)
+                if ok: st.success("Inviato! Grazie.")
+                else: st.error("Errore invio.")
 
     today = datetime.datetime.now().strftime("%d/%m")
-    
-    subject_email = urllib.parse.quote(f"Segnalazione Errori Patente Nautica App Pro")
-    
-    st.markdown(f"""
-    <div class='footer-sidebar'>
-        <b>v10.26 Ultimate</b> • {today}<br>
-        by Vincenzo Autolitano<br>
-        <a href='mailto:vincenzo.autolitano@gmail.com?subject={subject_email}'>⚠️ SEGNALA ERRORE</a>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"""<div class='footer-sidebar'><b>v20.32 Pro</b> • {today}<br>Developed by Vincenzo Autolitano</div>""", unsafe_allow_html=True)
 
-# --- 9. INTERFACCIA PRINCIPALE ---
+# --- 7. INTERFACCIA PRINCIPALE ---
 current_icon = icon_map = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}.get(st.session_state.quiz_mode, '⚓')
 
 if st.session_state.stats_mode:
-    st.markdown('<div class="question-card">', unsafe_allow_html=True)
-    st.markdown(f"## 📊 Statistiche: {st.session_state.quiz_mode}")
+    st.markdown(f"## 📊 Dashboard: {st.session_state.quiz_mode}")
     mem_data = []
-    prefix = f"{st.session_state.quiz_mode}_"
+    current_ids = set(db['ID Progressivo'].astype(str))
     for k, v in st.session_state.history.items():
-        if k.startswith(prefix):
-            clean_id = k.replace(prefix, "")
-            mem_data.append({'ID Progressivo': clean_id, 'Status': v})
-    df_mem = pd.DataFrame(mem_data)
+        if k in current_ids: mem_data.append({'ID Progressivo': k, 'Score': v['score'], 'Date': v['date']})
     
-    if len(df_mem) > 0 and len(db) > 0:
-        df_stats = pd.merge(db, df_mem, on='ID Progressivo', how='left')
-        df_stats['Status'] = df_stats['Status'].fillna(0)
-        df_stats['Masterizzata'] = df_stats['Status'] > 0
-        df_stats['Errore'] = df_stats['Status'] == -1
-        
-        if 'Argomento' in df_stats.columns:
-            stats_grp = df_stats.groupby('Argomento').agg(
-                Totale=('ID Progressivo', 'count'),
-                Masterizzate=('Masterizzata', 'sum'),
-                Errori=('Errore', 'sum')
-            ).reset_index()
-            
-            stats_grp['% Completamento'] = (stats_grp['Masterizzate'] / stats_grp['Totale'] * 100).astype(int)
-            stats_grp = stats_grp.sort_values(by='% Completamento', ascending=False)
-            
-            tot_q = stats_grp['Totale'].sum()
-            tot_m = stats_grp['Masterizzate'].sum()
-            tot_e = stats_grp['Errori'].sum()
-            tot_p = int(tot_m / tot_q * 100) if tot_q > 0 else 0
-            
-            total_row = pd.DataFrame([{
-                'Argomento': '🔴 TOTALE GENERALE',
-                'Totale': tot_q,
-                'Masterizzate': tot_m,
-                'Errori': tot_e,
-                '% Completamento': tot_p
-            }])
-            stats_grp = pd.concat([stats_grp, total_row], ignore_index=True)
-            stats_grp = stats_grp.rename(columns={'Masterizzate': 'Consolidate'})
-            
-            st.dataframe(stats_grp, column_config={
-                    "% Completamento": st.column_config.ProgressColumn("%", min_value=0, max_value=100, format="%d%%"),
-                    "Errori": st.column_config.NumberColumn("⚠️ Errori"),
-                    "Consolidate": st.column_config.NumberColumn("✅ OK")
-                }, hide_index=True, use_container_width=True)
-        else: st.warning("Colonna 'Argomento' mancante.")
-    else: st.info("Nessun dato salvato.")
-    st.markdown('</div>', unsafe_allow_html=True)
+    if len(mem_data) > 0:
+        df_mem = pd.DataFrame(mem_data)
+        df_full = pd.merge(db, df_mem, on='ID Progressivo', how='inner')
+    else: df_full = pd.DataFrame(columns=list(db.columns) + ['Score', 'Date'])
+
+    tot_risposte = len(df_full)
+    tot_master = len(df_full[df_full['Score'] > 0])
+    tot_errori = len(df_full[df_full['Score'] == -1])
+    perc_master = int((tot_master / tot_risposte) * 100) if tot_risposte > 0 else 0
+    
+    c1, c2, c3 = st.columns(3)
+    with c1: ui.draw_stat_metric("Domande Svolte", tot_risposte, "Totale in questa materia", "blue")
+    with c2: ui.draw_stat_metric("Consolidate", f"{tot_master}", f"{perc_master}% del totale", "green")
+    with c3: ui.draw_stat_metric("Errori Attivi", tot_errori, "Da ripassare con urgenza", "red")
+    st.markdown("---")
+    
+    tab1, tab2, tab3 = st.tabs(["📋 Dettaglio", "📉 Punti Deboli", "🗓️ Trend"])
+    
+    with tab1:
+        st.markdown("### 📋 Stato Avanzamento")
+        if 'Argomento' in db.columns:
+            df_full['IsMaster'] = df_full['Score'] > 0
+            df_full['IsError'] = df_full['Score'] == -1
+            user_stats = df_full.groupby('Argomento').agg(Consolidate=('IsMaster', 'sum'), Errori=('IsError', 'sum')).reset_index()
+            total_stats = db.groupby('Argomento').agg(Totale=('ID Progressivo', 'count')).reset_index()
+            final_table = pd.merge(total_stats, user_stats, on='Argomento', how='left').fillna(0)
+            final_table['% Completamento'] = (final_table['Consolidate'] / final_table['Totale'] * 100).astype(int)
+            st.dataframe(final_table.sort_values(by='% Completamento', ascending=False), hide_index=True, use_container_width=True)
+    
+    with tab2:
+        if len(df_full) > 0 and 'Argomento' in df_full.columns:
+            err_df = df_full[df_full['Score'] == -1]
+            if len(err_df) > 0:
+                st.bar_chart(err_df['Argomento'].value_counts(), color="#ff4b4b")
+            else: st.success("Nessun errore attivo!")
+    
+    with tab3:
+        if len(df_full) > 0 and 'Date' in df_full.columns:
+            df_full['Day'] = pd.to_datetime(df_full['Date']).dt.date
+            st.line_chart(df_full.groupby('Day').count()['ID Progressivo'])
 
 else:
-    title_suffix = "Ripasso" if st.session_state.review_mode else ("Simulazione Esame" if st.session_state.exam_mode else "Allenamento")
+    title_suffix = "Ripasso" if st.session_state.review_mode else ("Simulazione Esame" if st.session_state.exam_mode else "Allenamento Smart")
     st.markdown(f"## {current_icon} {st.session_state.quiz_mode} - *{title_suffix}*")
 
     if not st.session_state.exam_finished:
         tot = st.session_state.score_ok + st.session_state.score_ko
         perc = int(st.session_state.score_ok / tot * 100) if tot > 0 else 0
         st.markdown(f'<div class="metric-container"><div class="metric-box"><div class="metric-label">Esatte</div><div class="metric-value" style="color:green">{st.session_state.score_ok}</div></div><div class="metric-box"><div class="metric-label">Errate</div><div class="metric-value" style="color:red">{st.session_state.score_ko}</div></div><div class="metric-box"><div class="metric-label">%</div><div class="metric-value">{perc}%</div></div></div>', unsafe_allow_html=True)
-        
         if st.session_state.exam_mode or st.session_state.review_mode:
-            q_current = st.session_state.exam_index + 1
-            q_total = len(st.session_state.exam_questions)
-            st.progress(q_current / q_total)
-            st.caption(f"📝 Domanda {q_current} di {q_total}")
+            st.progress((st.session_state.exam_index + 1) / len(st.session_state.exam_questions))
+            st.caption(f"📝 Domanda {st.session_state.exam_index + 1} di {len(st.session_state.exam_questions)}")
 
     if st.session_state.exam_finished:
         st.markdown('<div class="question-card">', unsafe_allow_html=True)
         if st.session_state.review_mode:
-            prefix = f"{st.session_state.quiz_mode}_"
-            errors_left = 0
-            for k, v in st.session_state.history.items():
-                if v == -1 and k.startswith(prefix):
-                    errors_left += 1
-            st.markdown(f"""<div class="review-end"><h1>✅ Ripasso Completato</h1><p>Hai terminato questa serie di ripasso.</p></div>""", unsafe_allow_html=True)
-            if errors_left == 0:
-                st.success("COMPLIMENTI! Hai azzerato tutti gli errori in questa materia! 🏆")
-            else:
-                st.info(f"⚠️ Nel database rimangono ancora **{errors_left}** errori da correggere.")
+            st.markdown(f"""<div class="review-end"><h1>✅ Ripasso Completato</h1></div>""", unsafe_allow_html=True)
             st.button("TORNA AL MENU", type="primary", on_click=reset_game, kwargs={'exam': False})
-
         elif st.session_state.exam_mode:
-            allowed_errors = 4 if "Base" in st.session_state.quiz_mode else 1
-            passed = st.session_state.score_ko <= allowed_errors
-            if passed:
-                st.markdown(f"""<div class="exam-pass"><h1>🎉 SUPERATO! 🎉</h1><p>Hai fatto solo {st.session_state.score_ko} errori.</p></div>""", unsafe_allow_html=True)
+            allowed = 4 if "Base" in st.session_state.quiz_mode else 1
+            if st.session_state.score_ko <= allowed:
+                st.markdown(f"""<div class="exam-pass"><h1>🎉 SUPERATO! 🎉</h1><p>Errori: {st.session_state.score_ko}</p></div>""", unsafe_allow_html=True)
                 st.balloons()
             else:
-                st.markdown(f"""<div class="exam-fail"><h1>🚫 NON SUPERATO</h1><p>Troppi errori ({st.session_state.score_ko}). Il massimo consentito è {allowed_errors}.</p></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class="exam-fail"><h1>🚫 NON SUPERATO</h1><p>Errori: {st.session_state.score_ko}</p></div>""", unsafe_allow_html=True)
             st.button("🔄 NUOVA SIMULAZIONE", type="primary", on_click=reset_game, kwargs={'exam': True})
         st.markdown('</div>', unsafe_allow_html=True)
 
     elif st.session_state.current_row is not None:
         row = st.session_state.current_row
-        
         if st.session_state.debug_mode:
-            ukey = get_unique_key(row.get('ID Progressivo'))
-            val = st.session_state.history.get(ukey)
-            w = calculate_weight(val)
-            status_text = "🆕 MAI VISTA"
-            if val == -1: status_text = "🔴 ERRORE ATTIVO"
-            elif val is not None and val > 0: status_text = f"🟢 CORRETTA {val} VOLTE"
-            st.markdown(f"""<div class="debug-info">🔧 <b>DEBUG:</b> ID {row.get('ID Progressivo')} | Status: <b>{status_text}</b> | Peso: <b>{w:.2f}</b></div>""", unsafe_allow_html=True)
+            item = st.session_state.history.get(str(row.get('ID Progressivo')), {'score': 0, 'date': ''})
+            st.markdown(f"""<div class="debug-info">🔧 <b>SRS:</b> ID {row.get('ID Progressivo')} | Score: {item['score']}</div>""", unsafe_allow_html=True)
 
         if "Carteggio" in st.session_state.quiz_mode:
             st.markdown(f"**Esercizio {row.get('ID Progressivo')}**")
@@ -639,8 +424,10 @@ else:
             if not st.session_state.answered:
                 if st.button("👁️ MOSTRA SOLUZIONE", type="primary"): st.session_state.answered = True; st.rerun()
             else:
+                st.markdown("### 📐 Analisi della Soluzione")
+                if "velocità" in str(row.get('Domanda')).lower(): st.latex(r"V = \frac{S (Miglia)}{T (Ore)}")
                 sol_data = {"Parametro": ["Distanza", "Velocità", "Carburante", "Partenza", "Arrivo"], "Soluzione": [row.get(f'Soluzione {i+1}') for i in range(5)]}
-                st.table(pd.DataFrame(sol_data))
+                st.dataframe(pd.DataFrame(sol_data), hide_index=True, use_container_width=True)
                 c1, c2 = st.columns(2)
                 if c1.button("✅ GIUSTO"): answer(True); next_question(); st.rerun()
                 if c2.button("❌ SBAGLIATO"): answer(False); next_question(); st.rerun()
@@ -651,34 +438,20 @@ else:
                 if pth: st.image(Image.open(pth), use_container_width=True)
                 else: st.markdown("<div class='placeholder-img'>⚓<br>NO IMMAGINE</div>", unsafe_allow_html=True)
             with c2:
-                # --- QUIZ BOX SOLIDO (LAYOUT AGGIORNATO E TESTI RIPRISTINATI) ---
-                st.markdown(f"""
-                <div class="question-box">
-                    <div class="question-header">
-                        <span class="question-id">DOMANDA {row.get('ID Progressivo')}</span>
-                        <span class="question-topic">{row.get('Argomento')} - <i>{row.get('Voce','')}</i></span>
-                    </div>
-                    <div class="question-text">{row.get('Domanda')}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
+                ui.draw_question_card(row.get('ID Progressivo'), row.get('Argomento'), row.get('Voce', ''), row.get('Domanda'))
                 for i, opt in enumerate(st.session_state.shuffled_options):
                     if st.session_state.answered:
                         bg = "#d1e7dd" if opt['ok'] else "#f8d7da" 
                         icon = "✅" if opt['ok'] else "❌"
                         st.markdown(f"<div class='result-box' style='background:{bg};'>{icon} {opt['txt']}</div>", unsafe_allow_html=True)
                     else:
-                        if st.button(f"{chr(65+i)}. {opt['txt']}", key=f"btn_{i}"): 
-                            answer(opt['ok'])
-                            st.rerun()
-                
+                        if st.button(f"{chr(65+i)}. {opt['txt']}", key=f"btn_{i}"): answer(opt['ok']); st.rerun()
                 if st.session_state.answered:
                     q_url = urllib.parse.quote(f"Patente nautica spiegazione {row.get('Domanda','')}")
                     st.markdown(f'<a href="https://www.google.com/search?q={q_url}" target="_blank" class="google-box" style="text-align:center">💡 <b>Approfondimento:</b> Cerca su Google</a>', unsafe_allow_html=True)
-                    if st.button("PROSSIMA DOMANDA ➡", type="primary"): 
-                        next_question()
-                        st.rerun()
+                    if st.button("PROSSIMA DOMANDA ➡", type="primary"): next_question(); st.rerun()
 
     if st.session_state.current_row is None: 
         reset_game(False)
+
         st.rerun()
