@@ -1,4 +1,4 @@
-# --- VERSIONE APP: v10.24 (Sidebar Image Background) ---
+# --- VERSIONE APP: v10.25 (UI Fixes & Layout Domanda) ---
 import streamlit as st
 import pandas as pd
 import os
@@ -112,14 +112,99 @@ if os.path.exists(MAIN_BG_IMAGE):
 if os.path.exists(SIDEBAR_BG_IMAGE):
     add_sidebar_bg(SIDEBAR_BG_IMAGE)
 
-# CSS STILI GENERALI
+# CSS STILI GENERALI AGGIORNATI (v10.25)
 st.markdown("""
 <style>
     /* Layout Generale */
     .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; }
     
-    /* Titoli */
+    /* --- BOTTONI (Correzione Visibilità) --- */
+    /* Stile base per TUTTI i bottoni */
+    div.stButton > button {
+        width: 100%; 
+        border-radius: 8px; 
+        height: auto; 
+        padding: 12px; 
+        font-size: 16px; 
+        margin-bottom: 5px; 
+        background-color: #ffffff !important; /* Sfondo Bianco Solido SEMPRE */
+        border: 1px solid #ced4da !important; /* Bordo Grigio visibile */
+        color: #212529 !important; /* Testo Scuro */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.2s ease;
+    }
+    
+    /* Effetto Hover (quando passi sopra) */
+    div.stButton > button:hover {
+        border-color: #0d6efd !important;
+        color: #0d6efd !important;
+        background-color: #f8f9fa !important;
+        transform: translateY(-1px);
+    }
+
+    /* --- BOTTONE PRIMARIO (ACCEDI / NUOVA SIMULAZIONE) --- */
+    div.stButton > button[kind="primary"] {
+        background-color: #ff4b4b !important; 
+        color: white !important;
+        border: none !important;
+        font-weight: bold !important;
+        font-size: 18px !important; 
+        padding: 15px !important; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
+
+    div.stButton > button[kind="primary"]:hover {
+        background-color: #ff3333 !important;
+        box-shadow: 0 6px 8px rgba(0,0,0,0.3);
+    }
+
+    /* --- TITOLI E TESTI --- */
     h2 { color: white !important; text-shadow: 2px 2px 4px #000000; font-weight: 800 !important; }
+    
+    /* --- BOX DOMANDA AGGIORNATO (Argomento in alto) --- */
+    .question-box {
+        background-color: #e3f2fd;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 6px solid #1565c0;
+        margin-bottom: 20px;
+        color: #0d47a1;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    /* Intestazione Domanda */
+    .question-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        border-bottom: 1px solid rgba(13, 71, 161, 0.2);
+        padding-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .question-id { 
+        font-size: 14px; 
+        font-weight: 900; 
+        color: #1565c0; 
+        text-transform: uppercase; 
+        letter-spacing: 0.5px;
+    }
+    
+    .question-topic {
+        font-size: 13px;
+        color: #455a64;
+        font-style: italic;
+        text-align: right;
+        font-weight: 600;
+    }
+
+    .question-text { 
+        font-size: 20px; 
+        font-weight: 700; 
+        line-height: 1.5; 
+        color: #0d47a1; 
+    }
     
     /* Metriche */
     .metric-container { display: flex; justify-content: space-between; background-color: white; padding: 5px 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); margin-bottom: 15px; }
@@ -127,22 +212,9 @@ st.markdown("""
     .metric-label { font-size: 10px; color: #888; text-transform: uppercase; font-weight: bold; }
     .metric-value { font-size: 18px; font-weight: 800; color: #333; }
     
-    /* Bottoni Sidebar (Migliorati per sfondo immagine) */
-    .stButton button { 
-        width: 100%; 
-        border-radius: 8px; 
-        height: auto; 
-        padding: 10px; 
-        font-size: 16px; 
-        margin-bottom: 5px; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        background-color: rgba(255, 255, 255, 0.9); /* Leggera trasparenza per leggere su mappa */
-        border: 1px solid #ccc;
-    }
-    
     /* Bottone Esci */
-    div[data-testid="column"] button { padding: 5px 0px; font-size: 20px; border: 1px solid #ddd; background-color: transparent; color: #d63384; font-weight: bold; }
-    div[data-testid="column"] button:hover { background-color: #fce4ec; border-color: #d63384; }
+    div[data-testid="column"] button { padding: 5px 0px; font-size: 20px; border: 1px solid #ddd; background-color: transparent !important; color: #d63384 !important; font-weight: bold; }
+    div[data-testid="column"] button:hover { background-color: #fce4ec !important; border-color: #d63384 !important; }
     
     /* Box Risultati */
     .result-box { padding: 10px; border-radius: 6px; margin-bottom: 5px; color: #000; font-weight: 600; border: 1px solid rgba(0,0,0,0.1); font-size: 15px; }
@@ -166,20 +238,6 @@ st.markdown("""
     .login-title { font-size: 32px; font-weight: 800; color: #0061f2; margin-bottom: 5px; }
     .login-subtitle { font-size: 14px; color: #555; margin-bottom: 25px; font-weight: 500; }
     .footer-login { position: fixed; bottom: 20px; right: 20px; text-align: right; color: white; font-size: 14px; font-weight: bold; background-color: rgba(0,0,0,0.5); padding: 10px 15px; border-radius: 10px; backdrop-filter: blur(5px); }
-    
-    /* --- BOX DOMANDA SOLIDO (AZZURRO PIATTO) --- */
-    .question-box {
-        background-color: #e3f2fd; /* Azzurro SOLIDO */
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 6px solid #1565c0; /* Bordo laterale scuro */
-        margin-bottom: 20px;
-        color: #0d47a1;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    .question-id { font-size: 11px; font-weight: bold; text-transform: uppercase; color: #1565c0; letter-spacing: 1px; margin-bottom: 5px; }
-    .question-text { font-size: 18px; font-weight: 700; line-height: 1.4; color: #0d47a1; }
-    .question-sub { font-size: 13px; color: #546e7a; font-style: italic; margin-bottom: 0px; }
     
     .debug-info { font-size: 11px; color: #495057; background: #e9ecef; padding: 5px; border-radius: 4px; margin-bottom: 10px; border: 1px dashed #adb5bd; }
 </style>
@@ -248,12 +306,15 @@ if st.session_state.current_user is None:
         st.markdown("""
         <div class="login-container">
             <div class="login-title">⚓ Patente Nautica App Pro</div>
-            <div class="login-subtitle">Cloud Edition v10.24</div>
+            <div class="login-subtitle">Cloud Edition v10.25</div>
         </div>
         """, unsafe_allow_html=True)
         
         name_input = st.text_input("Inserisci il tuo nome per accedere:", placeholder="Es. Vincenzo").strip()
-        if st.button("ACCEDI", type="primary"):
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # AGGIORNATO: use_container_width=True per bottone grande
+        if st.button("ACCEDI AL SISTEMA", type="primary", use_container_width=True):
             if name_input:
                 with st.spinner("Accesso al database in corso..."):
                     hist = load_user_history(name_input)
@@ -264,17 +325,12 @@ if st.session_state.current_user is None:
         with st.expander("ℹ️ INFO E GUIDA ALL'USO"):
             st.markdown("""
             **A cosa serve questa App?**
-            Questa applicazione è uno strumento professionale per supportarti nello studio dei quiz ministeriali per il conseguimento della **Patente Nautica** (Entro 12 miglia e Senza Limiti) presso le Capitanerie di Porto Italiane.
+            Questa applicazione è uno strumento professionale per supportarti nello studio dei quiz ministeriali per il conseguimento della **Patente Nautica**.
 
             **Come funziona:**
             * 🎓 **Simulazione Esame:** Riproduce l'esame reale.
-                * *Quiz Base:* 20 domande (Max 4 errori ammessi).
-                * *Vela / Carteggio:* 5 domande (Max 1 errore ammesso).
-            * ♾️ **Allenamento Continuo:** Esercitazione libera su tutto il database senza limiti di tempo.
+            * ♾️ **Allenamento Continuo:** Esercitazione libera.
             * 🔄 **Ripasso Errori:** Una modalità speciale per rivedere solo i quiz che hai sbagliato in passato.
-
-            **Metodo di Ripetizione Intelligente:**
-            L'algoritmo interno impara dalle tue risposte. I quiz a cui rispondi in modo errato vengono "marcati" e riproposti con maggiore frequenza rispetto a quelli che già conosci.
             """)
 
     st.markdown("""
@@ -292,8 +348,8 @@ if db is None or len(db) == 0: st.stop()
 def get_unique_key(id_dom): return f"{st.session_state.quiz_mode}_{id_dom}"
 
 def calculate_weight(val):
-    if val is None: return 1.0       
-    if val == -1: return 10.0        
+    if val is None: return 1.0        
+    if val == -1: return 10.0          
     if val > 0: return 1.0 / (1.0 + val) 
     return 1.0
 
@@ -454,12 +510,11 @@ with st.sidebar:
 
     today = datetime.datetime.now().strftime("%d/%m")
     
-    # MAIL GENERICO CORRETTO
     subject_email = urllib.parse.quote(f"Segnalazione Errori Patente Nautica App Pro")
     
     st.markdown(f"""
     <div class='footer-sidebar'>
-        <b>v10.24 Ultimate</b> • {today}<br>
+        <b>v10.25 Ultimate</b> • {today}<br>
         by Vincenzo Autolitano<br>
         <a href='mailto:vincenzo.autolitano@gmail.com?subject={subject_email}'>⚠️ SEGNALA ERRORE</a>
     </div>
@@ -590,12 +645,14 @@ else:
                 if pth: st.image(Image.open(pth), use_container_width=True)
                 else: st.markdown("<div class='placeholder-img'>⚓<br>NO IMMAGINE</div>", unsafe_allow_html=True)
             with c2:
-                # --- QUIZ BOX SOLIDO ---
+                # --- QUIZ BOX SOLIDO AGGIORNATO (LAYOUT RICHIESTO) ---
                 st.markdown(f"""
                 <div class="question-box">
-                    <div class="question-id">Domanda {row.get('ID Progressivo')}</div>
+                    <div class="question-header">
+                        <span class="question-id">DOMANDA {row.get('ID Progressivo')}</span>
+                        <span class="question-topic">{row.get('Argomento')} - <i>{row.get('Voce','')}</i></span>
+                    </div>
                     <div class="question-text">{row.get('Domanda')}</div>
-                    <div class="question-sub">{row.get('Argomento')} - <i>{row.get('Voce','')}</i></div>
                 </div>
                 """, unsafe_allow_html=True)
                 
