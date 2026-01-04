@@ -1,4 +1,4 @@
-# ui.py - Modulo Gestione Interfaccia Grafica
+# ui.py - Modulo Gestione Interfaccia Grafica (Fix Tablet)
 import streamlit as st
 import base64
 import os
@@ -17,7 +17,7 @@ def set_backgrounds(main_bg, sidebar_bg):
         <style>
         .stApp {{
             background-image: url(data:image/jpg;base64,{bin_str});
-            background-size: 100vw 100vh;
+            background-size: cover; /* Usa 'cover' invece di 100vw/vh per non deformare */
             background-position: center center;
             background-repeat: no-repeat;
             background-attachment: fixed;
@@ -36,7 +36,8 @@ def set_backgrounds(main_bg, sidebar_bg):
             background-position: center;
         }}
         [data-testid="stSidebar"] > div:first-child {{
-            background-color: transparent;
+            background-color: rgba(255, 255, 255, 0.7); /* Sfondo semi-trasparente per leggere meglio */
+            backdrop-filter: blur(5px); /* Effetto sfocato moderno */
         }}
         </style>
         """, unsafe_allow_html=True)
@@ -48,14 +49,17 @@ def load_css():
         /* Layout Generale */
         .block-container { padding-top: 2rem !important; padding-bottom: 2rem !important; }
         
+        /* FORZA TESTO SCURO (Fix per Tablet Dark Mode) */
+        .stRadio label, .stMarkdown p, .stText, h1, h2, h3, .streamlit-expanderHeader {
+            color: #000000 !important;
+            font-weight: 500;
+        }
+        
         /* Bottoni */
         div.stButton > button { width: 100%; border-radius: 8px; padding: 12px; font-size: 16px; margin-bottom: 5px; background-color: #ffffff !important; border: 1px solid #ced4da !important; color: #212529 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s ease; }
         div.stButton > button:hover { border-color: #0d6efd !important; color: #0d6efd !important; background-color: #f8f9fa !important; transform: translateY(-1px); }
         div.stButton > button[kind="primary"] { background-color: #ff4b4b !important; color: white !important; border: none !important; font-weight: bold !important; font-size: 18px !important; padding: 15px !important; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
         div.stButton > button[kind="primary"]:hover { background-color: #ff3333 !important; box-shadow: 0 6px 8px rgba(0,0,0,0.3); }
-        
-        /* Testi */
-        h2 { color: white !important; text-shadow: 2px 2px 4px #000000; font-weight: 800 !important; }
         
         /* Box Vari */
         .question-box { background-color: #e3f2fd; padding: 20px; border-radius: 10px; border-left: 6px solid #1565c0; margin-bottom: 20px; color: #0d47a1; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
@@ -80,7 +84,7 @@ def load_css():
         .exam-pass { background-color: #d4edda; color: #155724; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #c3e6cb; margin-bottom: 20px; }
         .exam-fail { background-color: #f8d7da; color: #721c24; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #f5c6cb; margin-bottom: 20px; }
         .review-end { background-color: #e2e3e5; color: #383d41; padding: 20px; border-radius: 10px; text-align: center; border: 2px solid #d6d8db; margin-bottom: 20px; }
-        .footer-sidebar { font-size: 11px; color: #444; text-align: center; margin-top: 30px; padding-top: 10px; border-top: 1px solid #999; line-height: 1.6; font-weight: 500; }
+        .footer-sidebar { font-size: 11px; color: #000000 !important; text-align: center; margin-top: 30px; padding-top: 10px; border-top: 1px solid #999; line-height: 1.6; font-weight: 600; }
         .footer-sidebar a { color: #0061f2; text-decoration: none; font-weight: bold; }
         
         /* Login */
@@ -131,7 +135,6 @@ def draw_rank_box(rank_name, current, target):
     </div>
     """, unsafe_allow_html=True)
 
-# --- AGGIUNTA PER STATISTICHE (Incolla in fondo a ui.py) ---
 def draw_stat_metric(label, value, sub_text="", color="blue"):
     colors = {
         "blue": "#e3f2fd", "green": "#d1e7dd", "red": "#f8d7da", "yellow": "#fff3cd"
