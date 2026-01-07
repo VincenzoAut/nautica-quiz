@@ -1,2 +1,10 @@
+# File temporanei Python
+__pycache__/
+*.pyc
+
+# File di configurazione Streamlit (se contengono password)
 .streamlit/secrets.toml
-**/__pycache__/
+
+# File di sistema Mac/Windows
+.DS_Store
+Thumbs.db
