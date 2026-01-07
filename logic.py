@@ -1,72 +1,112 @@
-import datetime
+# logic.py - v26.0 (Target 20 Questions)
 import pandas as pd
 import random
+import datetime
 
-# --- CONFIGURAZIONE SRS ---
-SRS_INTERVALS = {0: 0, 1: 3, 2: 7, 3: 15}
-
-# --- NUOVO: DISTRIBUZIONE MINISTERIALE ---
-DISTRIBUZIONE_BASE = {
-    "TEORIA DELLO SCAFO": 1,
-    "MOTORI": 1,
-    "SICUREZZA DELLA NAVIGAZIONE": 3,
-    "MANOVRA E CONDOTTA": 4,
-    "COLREG E SEGNALAMENTO MARITTIMO": 2,
-    "METEOROLOGIA": 2,
-    "NAVIGAZIONE CARTOGRAFICA ED ELETTRONICA": 4,
-    "NORMATIVA DIPORTISTICA E AMBIENTALE": 3
+# --- CONFIGURAZIONE REGOLE ESAME BASE ---
+# Decreto Direttoriale n. 131 del 31/05/2022
+RULES_BASE = {
+    "Scafo": 1,          # Teoria dello Scafo
+    "Motori": 1,         # Motori
+    "Sicurezza": 3,      # Sicurezza
+    "Manovra": 4,        # Manovra e Condotta
+    "Colreg": 2,         # Colreg e Segnalamento
+    "Meteorologia": 2,   # Meteorologia
+    "Navigazione": 4,    # Navigazione
+    "Normativa": 3       # Normativa
 }
 
-def get_days_diff(date_str):
-    if not date_str: return 9999
-    try:
-        last_date = datetime.datetime.strptime(date_str.split()[0], "%Y-%m-%d").date()
-        return (datetime.date.today() - last_date).days
-    except: return 9999
-
-def is_due_for_review(item_data):
-    score = item_data.get('score', 0)
-    if score <= 0: return True
-    days_passed = get_days_diff(item_data.get('date', ''))
-    return days_passed >= SRS_INTERVALS.get(score, 15)
-
-# --- NUOVO: FUNZIONE ESTRAZIONE BILANCIATA ---
-def get_balanced_exam_questions(full_db):
-    if full_db is None or full_db.empty: return pd.DataFrame()
+def get_balanced_exam_questions(df):
+    """Genera scheda esame bilanciata."""
+    exam_questions = []
+    df.columns = [c.strip() for c in df.columns]
     
-    exam_pool = []
-    # Itera su ogni argomento e pesca il numero esatto
-    for argomento, quantita in DISTRIBUZIONE_BASE.items():
-        subset = full_db[full_db['Argomento'] == argomento]
-        if len(subset) >= quantita:
-            exam_pool.append(subset.sample(quantita))
+    if 'Argomento' not in df.columns:
+        return df.sample(min(len(df), 20))
+
+    work_df = df.copy()
+    
+    for keyword, count in RULES_BASE.items():
+        subset = work_df[work_df['Argomento'].astype(str).str.contains(keyword, case=False, na=False)]
+        if len(subset) >= count:
+            selected = subset.sample(n=count)
+            exam_questions.append(selected)
         else:
-            # Fallback se non trova l'argomento (evita crash)
-            exam_pool.append(full_db.sample(min(quantita, len(full_db))))
-            
-    return pd.concat(exam_pool).sample(frac=1).reset_index(drop=True)
-
-def get_next_session_questions(full_db, user_history, mode="Allenamento", num_questions=20):
-    if full_db is None or full_db.empty: return pd.DataFrame()
+            if not subset.empty: exam_questions.append(subset)
     
-    all_ids = full_db['ID Progressivo'].astype(str).tolist()
-    due_ids = []
-    new_ids = []
-    
-    for q_id in all_ids:
-        if q_id in user_history:
-            if is_due_for_review(user_history[q_id]): due_ids.append(q_id)
-        else: new_ids.append(q_id)
-            
-    if mode == "Ripasso":
-        error_ids = [k for k,v in user_history.items() if v['score'] == -1 and k in all_ids]
-        final = error_ids + [qid for qid in due_ids if qid not in error_ids]
-        if not final: return pd.DataFrame()
-        picked = random.sample(final, min(len(final), num_questions))
-        return full_db[full_db['ID Progressivo'].isin(picked)]
+    if exam_questions:
+        final_exam = pd.concat(exam_questions)
+        return final_exam.sample(frac=1).reset_index(drop=True)
     else:
-        n_rev = int(num_questions * 0.7)
-        sel_rev = random.sample(due_ids, min(len(due_ids), n_rev))
-        rem = num_questions - len(sel_rev)
-        sel_new = random.sample(new_ids, min(len(new_ids), rem))
-        return full_db[full_db['ID Progressivo'].isin(sel_rev + sel_new)]
+        return df.sample(0)
+
+def get_next_session_questions(df, history, mode="Allenamento"):
+    """
+    Logica SRS (Spaced Repetition System).
+    Target: 20 domande per sessione Allenamento.
+    """
+    df.columns = [c.strip() for c in df.columns]
+    TARGET_QUESTIONS = 20  # <--- MODIFICA QUI: DA 10 A 20
+    
+    if not history and mode == "Ripasso":
+        return df.iloc[0:0]
+        
+    if not history and mode == "Allenamento":
+        return df.sample(min(len(df), TARGET_QUESTIONS))
+
+    today = datetime.datetime.now()
+    ids_error = []
+    ids_review_due = []
+    
+    for q_id, data in history.items():
+        score = data['score']
+        date_str = data['date']
+        try:
+            last_seen = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            days_passed = (today - last_seen).days
+        except: days_passed = 100
+
+        if score <= -1: ids_error.append(q_id)
+        elif score > 0:
+            threshold = 3
+            if score == 2: threshold = 7
+            elif score >= 3: threshold = 15
+            if days_passed >= threshold: ids_review_due.append(q_id)
+
+    df['ID Str'] = df['ID Progressivo'].astype(str)
+
+    if mode == "Ripasso":
+        subset = df[df['ID Str'].isin(ids_error)]
+        if subset.empty: return subset
+        return subset.sample(frac=1).head(TARGET_QUESTIONS)
+
+    else: # Allenamento
+        q_errors = df[df['ID Str'].isin(ids_error)]
+        q_reviews = df[df['ID Str'].isin(ids_review_due)]
+        
+        all_history_ids = set(history.keys())
+        q_new = df[~df['ID Str'].isin(all_history_ids)]
+        
+        selection = []
+        
+        # Logica di riempimento: un po' di errori, un po' di ripassi, il resto nuove
+        if not q_errors.empty: selection.append(q_errors.sample(min(len(q_errors), 5)))
+        if not q_reviews.empty: selection.append(q_reviews.sample(min(len(q_reviews), 5)))
+            
+        current_len = sum([len(x) for x in selection])
+        needed = TARGET_QUESTIONS - current_len
+        
+        if needed > 0 and not q_new.empty:
+            selection.append(q_new.sample(min(len(q_new), needed)))
+            
+        if not selection and not q_new.empty:
+             selection.append(q_new.sample(min(len(q_new), TARGET_QUESTIONS)))
+             
+        if selection:
+            final_df = pd.concat(selection)
+            # Se ne abbiamo prese troppe, taglia a 20
+            if len(final_df) > TARGET_QUESTIONS:
+                return final_df.sample(TARGET_QUESTIONS).reset_index(drop=True)
+            return final_df.sample(frac=1).reset_index(drop=True)
+        else:
+            return df.sample(min(len(df), TARGET_QUESTIONS))
