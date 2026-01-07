@@ -1,4 +1,4 @@
-# --- VERSIONE APP: v39.2 (Clean Logic & Layout Stabile) ---
+# --- VERSIONE APP: v39.3 (Stable + Google Search Restore) ---
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -15,7 +15,7 @@ import logic as brain
 import ui 
 
 # --- 1. CONFIGURAZIONE ---
-st.set_page_config(page_title="Patente Nautica v39.2", page_icon="⚓", layout="wide")
+st.set_page_config(page_title="Patente Nautica v39.3", page_icon="⚓", layout="wide")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FILE_QUIZ_BASE = os.path.join(BASE_DIR, "Quiz_Patente_Base_Finale_OK.xlsx")
@@ -61,11 +61,10 @@ if 'init' not in st.session_state:
     st.session_state.history = {} 
     st.session_state.init = True
 
-# --- 3. LOGICA IMMAGINI (NUOVA & PULITA) ---
+# --- 3. LOGICA IMMAGINI ---
 
 @st.cache_data(show_spinner=False)
 def load_raccordo_map():
-    """Carica il file Raccordo e crea una mappa {ID: NomeFile}."""
     if not os.path.exists(FILE_RACCORDO): return {}
     try:
         df = pd.read_excel(FILE_RACCORDO)
@@ -75,7 +74,6 @@ def load_raccordo_map():
         col_img = 'Immagine' if 'Immagine' in df.columns else None
         
         if col_id and col_img:
-            # Crea dizionario pulendo gli ID
             return dict(zip(
                 df[col_id].astype(str).str.replace(r'\.0$', '', regex=True).str.strip(),
                 df[col_img].astype(str).str.strip()
@@ -84,22 +82,17 @@ def load_raccordo_map():
     return {}
 
 def get_image_path_for_question(question_id):
-    """Restituisce il path dell'immagine per un dato ID domanda."""
     if not question_id: return None
     
-    # 1. Cerca nel mapping Excel
     raccordo_map = load_raccordo_map()
     clean_id = str(question_id).replace('.0','').strip()
     img_name = raccordo_map.get(clean_id)
     
     if not img_name: return None 
     
-    # 2. Cerca il file su disco
     target_path = os.path.join(CARTELLA_IMMAGINI, img_name)
-    
     if os.path.exists(target_path): return target_path
     
-    # Fallback: cerca file con estensione diversa o senza
     name_no_ext = os.path.splitext(img_name)[0].lower()
     for f in os.listdir(CARTELLA_IMMAGINI):
         if os.path.splitext(f)[0].lower() == name_no_ext:
@@ -107,10 +100,9 @@ def get_image_path_for_question(question_id):
             
     return None
 
-# --- 4. CARICAMENTO DATI (SEMPLIFICATO) ---
+# --- 4. CARICAMENTO DATI ---
 @st.cache_data
 def load_data(mode):
-    # Carica SOLO il database delle domande, senza merge inutili
     target_file = FILE_CARTEGGIO if "Carteggio" in mode else (FILE_QUIZ_VELA if "Vela" in mode else FILE_QUIZ_BASE)
     if not os.path.exists(target_file): return None
     try:
@@ -224,7 +216,7 @@ if st.session_state.current_user is None:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
-        ui.draw_login_header("v39.2 • Stable")
+        ui.draw_login_header("v39.3 • Stable")
         st.markdown("### 🔐 Accesso Allievi")
         c_in1, c_in2 = st.columns(2)
         with c_in1: name_input = st.text_input("👤 Nome").strip()
@@ -369,7 +361,7 @@ with st.sidebar:
         with st.form("rep"):
             msg = st.text_area("Msg:"); sent = st.form_submit_button("Invia")
             if sent: db_engine.save_report_to_db(st.session_state.current_user, str(st.session_state.current_row.get('ID Progressivo','')), msg); st.success("Inviato")
-    st.markdown(f"<div class='footer-sidebar'><b>v39.2</b> • {datetime.datetime.now().strftime('%d/%m')}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='footer-sidebar'><b>v39.3</b> • {datetime.datetime.now().strftime('%d/%m')}</div>", unsafe_allow_html=True)
 
 # --- 9. MAIN ---
 icon = {'Carteggio': '📐', 'Vela': '⛵', 'Base': '🛥️'}.get(st.session_state.quiz_mode, '⚓')
@@ -499,7 +491,6 @@ else:
         if "Carteggio" in st.session_state.quiz_mode:
              c1, c2 = st.columns([1, 2], gap="small")
              with c1:
-                 # Immagine Carteggio (width=350)
                  path_img = get_image_path_for_question(row.get('ID Progressivo'))
                  if path_img: st.image(Image.open(path_img), width=350)
 
@@ -525,11 +516,9 @@ else:
                      if c1_b.button("GIUSTO ✅", use_container_width=True): answer(True); next_question(); st.rerun()
                      if c2_b.button("SBAGLIATO ❌", type="primary", use_container_width=True): answer(False); next_question(); st.rerun()
         else:
-            # Layout Quiz Base - 2 Colonne
             c1, c2 = st.columns([1, 2], gap="small")
             
             with c1:
-                # Immagine ridimensionata 350px
                 path_img = get_image_path_for_question(row.get('ID Progressivo'))
                 if path_img: 
                     st.image(Image.open(path_img), width=350)
@@ -545,6 +534,13 @@ else:
                     st.divider()
                     expl = str(row.get('Spiegazione', '')).strip()
                     if expl: st.info(f"📘 Spiegazione: {expl}")
+                    
+                    # LINK GOOGLE RIPRISTINATO
+                    q_text = row.get('Domanda', '')
+                    short_q = (q_text[:75] + '..') if len(q_text) > 75 else q_text
+                    encoded_query = urllib.parse.quote(f"Patente Nautica {short_q}")
+                    st.markdown(f'<div style="text-align:right; margin-top:10px; margin-bottom:10px;"><a href="https://www.google.com/search?q={encoded_query}" target="_blank" style="text-decoration:none; color:#555; border:1px solid #ccc; padding:5px 10px; border-radius:5px; font-size:0.8em;">🔍 Cerca su Google</a></div>', unsafe_allow_html=True)
+
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("PROSSIMA ➡", type="primary", use_container_width=True): next_question(); st.rerun()
                 else:
